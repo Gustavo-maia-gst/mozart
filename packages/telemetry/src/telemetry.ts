@@ -37,9 +37,11 @@ export interface Telemetry {
  * context manager (so `context.active()` follows async flow within a process).
  */
 export function initTelemetry(opts: InitTelemetryOptions): Telemetry {
+  // `||` (not `??`): an empty string env/opt must fall through to the default,
+  // otherwise the OTLP exporter throws on an invalid ('') URL.
   const url =
-    opts.otlpUrl ??
-    process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ??
+    opts.otlpUrl ||
+    process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ||
     'http://localhost:4318/v1/traces';
 
   const exporter = new OTLPTraceExporter({ url });

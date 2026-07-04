@@ -4,6 +4,7 @@ import type { Scenario } from '@mozart/contracts';
 import { ATTR, TRACER_NAME, withSpan } from '@mozart/telemetry';
 import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
+import { FaultInjectorService } from '../fault/fault-injector.service';
 import { ProcessManagerService } from '../ipc-server/process-manager.service';
 import { RUN_ID, SCENARIO, SCHEDULER } from '../tokens';
 
@@ -33,6 +34,7 @@ export class RunService {
     @Inject(SCHEDULER) private readonly scheduler: Scheduler,
     private readonly events: EventLogService,
     private readonly pm: ProcessManagerService,
+    private readonly faults: FaultInjectorService,
   ) {}
 
   async run(opts: RunOptions = {}): Promise<RunSummary> {
@@ -66,6 +68,7 @@ export class RunService {
     this.logger.log('all nodes ready — activating protocol');
     // activate under the run's active span so the whole run is one trace tree.
     this.pm.activateAll();
+    this.faults.arm(); // fault `at` offsets count from activation
 
     await this.sleep(this.scenario.endCondition.ms);
 
