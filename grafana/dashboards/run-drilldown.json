@@ -6,7 +6,8 @@
   "uid": "mozart-run-drilldown",
   "tags": ["mozart"],
   "schemaVersion": 39,
-  "time": { "from": "now-6h", "to": "now" },
+  "time": { "from": "now-7d", "to": "now" },
+  "refresh": "",
   "templating": {
     "list": [
       { "name": "datasource", "type": "datasource", "query": "prometheus", "current": {}, "hide": 0 },
@@ -22,10 +23,21 @@
         "label": "Scenario"
       },
       {
+        "name": "protocol",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": { "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_protocol)", "refId": "p" },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "current": {},
+        "label": "Protocol"
+      },
+      {
         "name": "run",
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "query": { "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_run_id)", "refId": "r" },
+        "query": { "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}, mozart_run_id)", "refId": "r" },
         "refresh": 2,
         "sort": 5,
         "includeAll": false,
@@ -38,158 +50,147 @@
         "type": "textbox",
         "current": { "text": "", "value": "" },
         "label": "Jaeger service (coordinator)",
-        "description": "Service name used for the traces panel (the coordinator name from the scenario YAML, or 'mozart-master')."
+        "description": "Service name used for the traces panel (the coordinator name from the scenario YAML, or 'harness')."
       }
     ]
   },
   "panels": [
-    { "type": "row", "title": "Overview", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
+    { "type": "row", "title": "Outcome (final totals for the run)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
     {
       "type": "stat",
       "title": "Makespan (ms)",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "gridPos": { "h": 5, "w": 5, "x": 0, "y": 1 },
       "fieldConfig": { "defaults": { "unit": "ms" } },
       "options": { "colorMode": "value", "graphMode": "none" },
       "targets": [
-        {
-          "refId": "A",
-          "instant": true,
-          "expr": "histogram_sum(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}) / histogram_count(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"})"
-        }
+        { "refId": "A", "instant": true, "expr": "histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}[$__range])) / histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}[$__range]))" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Critical path (ms)",
+      "description": "Theoretical makespan floor: max cost-weighted path through the DAG.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 5, "w": 5, "x": 5, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "options": { "colorMode": "value", "graphMode": "none" },
+      "targets": [
+        { "refId": "A", "instant": true, "expr": "histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_run_id=\"$run\"}[$__range])) / histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_run_id=\"$run\"}[$__range]))" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Coordination cost (ms)",
+      "description": "makespan − critical path: the overhead the protocol adds on top of the theoretical floor.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 5, "w": 4, "x": 10, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "options": { "colorMode": "value", "graphMode": "none" },
+      "targets": [
+        { "refId": "A", "instant": true, "expr": "(histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}[$__range])) / histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}[$__range]))) - (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_run_id=\"$run\"}[$__range])) / histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_run_id=\"$run\"}[$__range])))" }
       ]
     },
     {
       "type": "stat",
       "title": "Tasks completed",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "gridPos": { "h": 5, "w": 5, "x": 14, "y": 1 },
       "fieldConfig": { "defaults": { "unit": "short" } },
       "options": { "colorMode": "value", "graphMode": "none" },
       "targets": [
-        { "refId": "A", "instant": true, "expr": "sum(mozart_worker_tasks_total{outcome=\"completed\", mozart_run_id=\"$run\"})" }
+        { "refId": "A", "instant": true, "expr": "sum(last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_run_id=\"$run\"}[$__range]))" }
       ]
     },
     {
       "type": "stat",
       "title": "Tasks failed",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "gridPos": { "h": 5, "w": 5, "x": 19, "y": 1 },
       "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } } },
       "options": { "colorMode": "value", "graphMode": "none" },
       "targets": [
-        { "refId": "A", "instant": true, "expr": "sum(mozart_worker_tasks_total{outcome=\"failed\", mozart_run_id=\"$run\"})" }
+        { "refId": "A", "instant": true, "expr": "sum(last_over_time(mozart_worker_tasks_total{outcome=\"failed\", mozart_run_id=\"$run\"}[$__range]))" }
+      ]
+    },
+    { "type": "row", "title": "Message & storage mix", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 } },
+    {
+      "type": "bargauge",
+      "title": "Messages by type",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 7 },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        { "refId": "A", "instant": true, "expr": "sum by (type) (last_over_time(mozart_messages_total{mozart_run_id=\"$run\"}[$__range]))", "legendFormat": "{{type}}" }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Storage ops by op",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 7 },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        { "refId": "A", "instant": true, "expr": "sum by (op) (last_over_time(mozart_storage_ops_total{mozart_run_id=\"$run\"}[$__range]))", "legendFormat": "{{op}}" }
       ]
     },
     {
       "type": "stat",
       "title": "Redelivery ratio",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 7 },
       "fieldConfig": { "defaults": { "unit": "percentunit" } },
       "options": { "colorMode": "value", "graphMode": "none" },
       "targets": [
-        {
-          "refId": "A",
-          "instant": true,
-          "expr": "sum(mozart_messages_total{type=\"redelivered\", mozart_run_id=\"$run\"}) / sum(mozart_messages_total{type=\"delivered\", mozart_run_id=\"$run\"})"
-        }
+        { "refId": "A", "instant": true, "expr": "sum(last_over_time(mozart_messages_total{type=\"redelivered\", mozart_run_id=\"$run\"}[$__range])) / sum(last_over_time(mozart_messages_total{type=\"delivered\", mozart_run_id=\"$run\"}[$__range]))" }
       ]
     },
-    { "type": "row", "title": "Throughput over time", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 } },
     {
-      "type": "timeseries",
-      "title": "Task outcome rate (/s)",
+      "type": "stat",
+      "title": "Redundant worker-starts caught",
+      "description": "duplicate-start: a duplicate reached worker.start for an already-running task. 0 for an idempotent protocol.",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
-      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 15, "stacking": { "mode": "normal" } } } },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 11 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "colorMode": "value", "graphMode": "none" },
       "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (outcome) (rate(mozart_worker_tasks_total{mozart_run_id=\"$run\"}[$__rate_interval]))",
-          "legendFormat": "{{outcome}}"
-        }
+        { "refId": "A", "instant": true, "expr": "sum(last_over_time(mozart_worker_tasks_total{outcome=\"duplicate-start\", mozart_run_id=\"$run\"}[$__range]))" }
       ]
     },
+    { "type": "row", "title": "Latency distribution (whole run)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 } },
     {
-      "type": "timeseries",
-      "title": "Message rate by type (/s)",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
-      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 15 } } },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (type) (rate(mozart_messages_total{mozart_run_id=\"$run\"}[$__rate_interval]))",
-          "legendFormat": "{{type}}"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Storage op rate by op (/s)",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
-      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 15 } } },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (op) (rate(mozart_storage_ops_total{mozart_run_id=\"$run\"}[$__rate_interval]))",
-          "legendFormat": "{{op}}"
-        }
-      ]
-    },
-    { "type": "row", "title": "Concurrency (live gauges)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 } },
-    {
-      "type": "timeseries",
-      "title": "In-flight messages (delivered, unacked)",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 20 } } },
-      "targets": [
-        { "refId": "A", "expr": "sum(mozart_transport_inflight{mozart_run_id=\"$run\"})", "legendFormat": "in-flight" }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Exclusive-lock leases held",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 20 } } },
-      "targets": [
-        { "refId": "A", "expr": "sum(mozart_storage_leases_held{mozart_run_id=\"$run\"})", "legendFormat": "leases held" }
-      ]
-    },
-    { "type": "row", "title": "Latency percentiles over time", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 } },
-    {
-      "type": "timeseries",
+      "type": "bargauge",
       "title": "Worker task duration p50/p90/p99 (ms)",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" },
       "fieldConfig": { "defaults": { "unit": "ms" } },
       "targets": [
-        { "refId": "p50", "expr": "histogram_quantile(0.5, sum(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}))", "legendFormat": "p50" },
-        { "refId": "p90", "expr": "histogram_quantile(0.9, sum(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}))", "legendFormat": "p90" },
-        { "refId": "p99", "expr": "histogram_quantile(0.99, sum(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}))", "legendFormat": "p99" }
+        { "refId": "p50", "instant": true, "expr": "histogram_quantile(0.5, sum(last_over_time(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}[$__range])))", "legendFormat": "p50" },
+        { "refId": "p90", "instant": true, "expr": "histogram_quantile(0.9, sum(last_over_time(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}[$__range])))", "legendFormat": "p90" },
+        { "refId": "p99", "instant": true, "expr": "histogram_quantile(0.99, sum(last_over_time(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}[$__range])))", "legendFormat": "p99" }
       ]
     },
     {
-      "type": "timeseries",
+      "type": "bargauge",
       "title": "Ack round-trip & lock wait p95 (ms)",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" },
       "fieldConfig": { "defaults": { "unit": "ms" } },
       "targets": [
-        { "refId": "ack", "expr": "histogram_quantile(0.95, sum(mozart_transport_ack_latency_milliseconds{mozart_run_id=\"$run\"}))", "legendFormat": "ack p95" },
-        { "refId": "lock", "expr": "histogram_quantile(0.95, sum(mozart_storage_lock_wait_milliseconds{mozart_run_id=\"$run\"}))", "legendFormat": "lock wait p95" }
+        { "refId": "ack", "instant": true, "expr": "histogram_quantile(0.95, sum(last_over_time(mozart_transport_ack_latency_milliseconds{mozart_run_id=\"$run\"}[$__range])))", "legendFormat": "ack p95" },
+        { "refId": "lock", "instant": true, "expr": "histogram_quantile(0.95, sum(last_over_time(mozart_storage_lock_wait_milliseconds{mozart_run_id=\"$run\"}[$__range])))", "legendFormat": "lock wait p95" }
       ]
     },
-    { "type": "row", "title": "Traces (Jaeger)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 } },
+    { "type": "row", "title": "Traces (Jaeger) — the run's timeline lives here", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 } },
     {
       "type": "traces",
       "title": "Recent traces — set the $service variable (coordinator name)",
       "datasource": { "type": "jaeger", "uid": "mozart-jaeger" },
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 42 },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 25 },
       "targets": [
         { "refId": "A", "queryType": "search", "service": "$service", "limit": 20 }
       ]

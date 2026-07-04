@@ -58,6 +58,7 @@ async function bootstrap(): Promise<void> {
     },
     otlpUrl: env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
     metricsOtlpUrl: env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
+    metricExportIntervalMs: env.MOZART_METRIC_EXPORT_INTERVAL_MS,
     processor: env.MOZART_OTEL_PROCESSOR,
   });
 

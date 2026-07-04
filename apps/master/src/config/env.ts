@@ -22,6 +22,13 @@ export const envSchema = z.object({
    */
   MOZART_SLAVE_ENTRYPOINT: z.string().optional(),
   MOZART_OTEL_PROCESSOR: z.enum(['batch', 'simple']).optional(),
+  /**
+   * Metric export interval (ms). A run lasts seconds and metrics flush on
+   * shutdown, so the OTel default (60s) yields a single sample per series —
+   * enough for cumulative totals, but rate()/over-time panels need several. A
+   * short interval spreads samples across the run so those panels populate.
+   */
+  MOZART_METRIC_EXPORT_INTERVAL_MS: z.coerce.number().int().positive().default(10),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

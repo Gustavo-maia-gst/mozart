@@ -66,17 +66,6 @@ interface AdvanceBody extends JsonObject {
 export class TopologicalBarrierProtocol extends Protocol {
   override readonly name = 'topological-barrier';
 
-  /** Persist every task with its topological order (the one place order is computed). */
-  public override async persistGraph(graph: Graph): Promise<void> {
-    const gid = idOf(graph);
-    const orders = topologicalOrders(graph);
-    for (const [taskId, order] of orders) {
-      const record: TaskRecord = { kind: TASK_KIND, graphId: gid, order, status: 'pending' };
-      await this.storage.save(taskId, record);
-    }
-    this.log.info('graph persisted', { graphId: gid, tasks: graph.order });
-  }
-
   /** Kick off the barrier at the first level. */
   public override async startGraph(graphId: GraphId): Promise<void> {
     this.log.info('graph started', { graphId });
@@ -168,6 +157,17 @@ export class TopologicalBarrierProtocol extends Protocol {
 
   private metaKey(graphId: GraphId): string {
     return `barrier-meta:${graphId}`;
+  }
+
+  /** Persist every task with its topological order (the one place order is computed). */
+  public override async persistGraph(graph: Graph): Promise<void> {
+    const gid = idOf(graph);
+    const orders = topologicalOrders(graph);
+    for (const [taskId, order] of orders) {
+      const record: TaskRecord = { kind: TASK_KIND, graphId: gid, order, status: 'pending' };
+      await this.storage.save(taskId, record);
+    }
+    this.log.info('graph persisted', { graphId: gid, tasks: graph.order });
   }
 }
 

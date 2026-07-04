@@ -1,12 +1,19 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "graphTooltip": 1,
   "title": "Mozart — Protocol comparison",
   "uid": "mozart-protocol-comparison",
-  "tags": ["mozart"],
+  "tags": [
+    "mozart"
+  ],
   "schemaVersion": 39,
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
@@ -19,31 +26,52 @@
       {
         "name": "scenario",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "query": { "query": "label_values(mozart_messages_total, mozart_scenario)", "refId": "sc" },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(mozart_messages_total, mozart_scenario)",
+          "refId": "sc"
+        },
         "refresh": 2,
         "includeAll": true,
         "multi": true,
         "allValue": ".*",
-        "current": { "text": "All", "value": "$__all" },
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
         "label": "Scenario"
       },
       {
         "name": "protocol",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "query": { "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_protocol)", "refId": "p" },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_protocol)",
+          "refId": "p"
+        },
         "refresh": 2,
         "includeAll": true,
         "multi": true,
         "allValue": ".*",
-        "current": { "text": "All", "value": "$__all" },
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
         "label": "Protocol"
       },
       {
         "name": "comms",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
         "query": {
           "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_latency_transport_deliver_mean)",
           "refId": "c"
@@ -52,19 +80,31 @@
         "includeAll": true,
         "multi": true,
         "allValue": ".*",
-        "current": { "text": "All", "value": "$__all" },
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
         "label": "Comms latency mean (ms)"
       },
       {
         "name": "storage",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "query": { "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_latency_storage_save_mean)", "refId": "s" },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_latency_storage_save_mean)",
+          "refId": "s"
+        },
         "refresh": 2,
         "includeAll": true,
         "multi": true,
         "allValue": ".*",
-        "current": { "text": "All", "value": "$__all" },
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
         "label": "Storage latency mean (ms)"
       }
     ]
@@ -73,21 +113,41 @@
     {
       "type": "row",
       "title": "Makespan & coordination cost",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
     },
     {
       "type": "bargauge",
       "title": "Coordination cost by protocol (ms)",
       "description": "makespan − critical-path cost. The critical path is the max cost-weighted path through the DAG (Σ costMs); this is the pure overhead the protocol adds on top of the theoretical floor. Lower is better; ~0 means no coordination tax.",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 1 },
-      "options": { "orientation": "horizontal", "displayMode": "gradient" },
-      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "(sum by (mozart_protocol) (histogram_sum(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"})) / sum by (mozart_protocol) (histogram_count(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}))) - (sum by (mozart_protocol) (histogram_sum(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"})) / sum by (mozart_protocol) (histogram_count(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"})))",
+          "expr": "(sum by (mozart_protocol) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_protocol) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))) - (sum by (mozart_protocol) (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_protocol) (histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))))",
           "legendFormat": "{{mozart_protocol}}"
         }
       ]
@@ -95,15 +155,30 @@
     {
       "type": "bargauge",
       "title": "Mean DAG makespan by protocol (ms)",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 1 },
-      "options": { "orientation": "horizontal", "displayMode": "gradient" },
-      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (histogram_sum(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"})) / sum by (mozart_protocol) (histogram_count(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}))",
+          "expr": "sum by (mozart_protocol) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_protocol) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
           "legendFormat": "{{mozart_protocol}}"
         }
       ]
@@ -111,15 +186,30 @@
     {
       "type": "bargauge",
       "title": "Messages per completed task",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 1 },
-      "options": { "orientation": "horizontal", "displayMode": "gradient" },
-      "fieldConfig": { "defaults": { "unit": "short" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}) / sum by (mozart_protocol) (mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"})",
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
           "legendFormat": "{{mozart_protocol}}"
         }
       ]
@@ -127,15 +217,30 @@
     {
       "type": "bargauge",
       "title": "Storage ops per completed task",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 1 },
-      "options": { "orientation": "horizontal", "displayMode": "gradient" },
-      "fieldConfig": { "defaults": { "unit": "short" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (mozart_storage_ops_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}) / sum by (mozart_protocol) (mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"})",
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_storage_ops_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
           "legendFormat": "{{mozart_protocol}}"
         }
       ]
@@ -143,26 +248,46 @@
     {
       "type": "row",
       "title": "Latency distributions (native histograms)",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      }
     },
     {
       "type": "bargauge",
       "title": "Worker task duration p50/p95 (ms)",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
-      "options": { "orientation": "horizontal", "displayMode": "gradient" },
-      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 10
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
       "targets": [
         {
           "refId": "p50",
           "instant": true,
-          "expr": "histogram_quantile(0.5, sum by (mozart_protocol) (mozart_worker_task_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}))",
+          "expr": "histogram_quantile(0.5, sum by (mozart_protocol) (last_over_time(mozart_worker_task_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
           "legendFormat": "{{mozart_protocol}} p50"
         },
         {
           "refId": "p95",
           "instant": true,
-          "expr": "histogram_quantile(0.95, sum by (mozart_protocol) (mozart_worker_task_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}))",
+          "expr": "histogram_quantile(0.95, sum by (mozart_protocol) (last_over_time(mozart_worker_task_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
           "legendFormat": "{{mozart_protocol}} p95"
         }
       ]
@@ -170,21 +295,36 @@
     {
       "type": "bargauge",
       "title": "Transport deliver latency p50/p95 (ms)",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
-      "options": { "orientation": "horizontal", "displayMode": "gradient" },
-      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 10
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
       "targets": [
         {
           "refId": "p50",
           "instant": true,
-          "expr": "histogram_quantile(0.5, sum by (mozart_protocol) (mozart_transport_deliver_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}))",
+          "expr": "histogram_quantile(0.5, sum by (mozart_protocol) (last_over_time(mozart_transport_deliver_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
           "legendFormat": "{{mozart_protocol}} p50"
         },
         {
           "refId": "p95",
           "instant": true,
-          "expr": "histogram_quantile(0.95, sum by (mozart_protocol) (mozart_transport_deliver_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}))",
+          "expr": "histogram_quantile(0.95, sum by (mozart_protocol) (last_over_time(mozart_transport_deliver_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
           "legendFormat": "{{mozart_protocol}} p95"
         }
       ]
@@ -192,15 +332,30 @@
     {
       "type": "bargauge",
       "title": "Storage op latency p95 by op (ms)",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
-      "options": { "orientation": "horizontal", "displayMode": "gradient" },
-      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 10
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "histogram_quantile(0.95, sum by (mozart_protocol, op) (mozart_storage_op_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}))",
+          "expr": "histogram_quantile(0.95, sum by (mozart_protocol, op) (last_over_time(mozart_storage_op_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
           "legendFormat": "{{mozart_protocol}} / {{op}}"
         }
       ]
@@ -208,20 +363,41 @@
     {
       "type": "row",
       "title": "Fault behaviour & message mix",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 }
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      }
     },
     {
       "type": "stat",
       "title": "Redelivery ratio (redelivered / delivered)",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
-      "options": { "colorMode": "value", "graphMode": "none", "orientation": "horizontal" },
-      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 19
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (mozart_messages_total{type=\"redelivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}) / sum by (mozart_protocol) (mozart_messages_total{type=\"delivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"})",
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"redelivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"delivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
           "legendFormat": "{{mozart_protocol}}"
         }
       ]
@@ -229,15 +405,31 @@
     {
       "type": "stat",
       "title": "Duplication ratio (duplicated / delivered)",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 19 },
-      "options": { "colorMode": "value", "graphMode": "none", "orientation": "horizontal" },
-      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 19
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (mozart_messages_total{type=\"duplicated\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}) / sum by (mozart_protocol) (mozart_messages_total{type=\"delivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"})",
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"duplicated\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"delivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
           "legendFormat": "{{mozart_protocol}}"
         }
       ]
@@ -245,15 +437,30 @@
     {
       "type": "bargauge",
       "title": "Messages by type",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
-      "options": { "orientation": "horizontal", "displayMode": "gradient" },
-      "fieldConfig": { "defaults": { "unit": "short" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 19
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (type) (mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"})",
+          "expr": "sum by (type) (last_over_time(mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
           "legendFormat": "{{type}}"
         }
       ]
@@ -261,21 +468,42 @@
     {
       "type": "row",
       "title": "Duplicates: injected vs redundant worker-starts",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 }
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      }
     },
     {
       "type": "stat",
       "title": "Duplicated messages injected",
       "description": "Extra copies the transport emitted (duplicateDeliveries fault).",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
-      "options": { "colorMode": "value", "graphMode": "none", "orientation": "horizontal" },
-      "fieldConfig": { "defaults": { "unit": "short" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 28
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (mozart_messages_total{type=\"duplicated\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"})",
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"duplicated\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
           "legendFormat": "{{mozart_protocol}}"
         }
       ]
@@ -284,15 +512,31 @@
       "type": "stat",
       "title": "Redundant worker-starts caught",
       "description": "worker.duplicate-start: a duplicate/redelivery reached worker.start for an already-running task and the pool deduped it. Stays 0 for an idempotent protocol.",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 28 },
-      "options": { "colorMode": "value", "graphMode": "none", "orientation": "horizontal" },
-      "fieldConfig": { "defaults": { "unit": "short" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 28
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (mozart_worker_tasks_total{outcome=\"duplicate-start\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"})",
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"duplicate-start\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
           "legendFormat": "{{mozart_protocol}}"
         }
       ]
@@ -301,18 +545,35 @@
       "type": "stat",
       "title": "Redundant starts per duplicate (leakage)",
       "description": "duplicate-start / duplicated. ~0 = the protocol absorbs duplicates; high = duplicates leak into redundant execution attempts.",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 28 },
-      "options": { "colorMode": "value", "graphMode": "none", "orientation": "horizontal" },
-      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 28
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (mozart_worker_tasks_total{outcome=\"duplicate-start\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}) / sum by (mozart_protocol) (mozart_messages_total{type=\"duplicated\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"})",
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"duplicate-start\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"duplicated\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
           "legendFormat": "{{mozart_protocol}}"
         }
       ]
     }
-  ]
+  ],
+  "refresh": "10s"
 }
