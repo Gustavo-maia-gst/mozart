@@ -51,12 +51,14 @@ export class ProcessManagerService {
 
   spawn(nodeId: NodeId): void {
     const entrypoint = this.env.MOZART_SLAVE_ENTRYPOINT ?? join(process.cwd(), 'apps/slave/dist/main.js');
+    const name = this.scenario.nodes.find((n) => n.id === nodeId)?.name ?? nodeId;
     const child = fork(entrypoint, [], {
       serialization: 'json',
       execArgv: [],
       env: {
         ...process.env,
         MOZART_NODE_ID: nodeId,
+        MOZART_NODE_NAME: name,
         MOZART_PROTOCOL: this.scenario.protocol,
         MOZART_RUN_ID: this.runId,
         OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: this.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,

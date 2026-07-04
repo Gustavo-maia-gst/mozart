@@ -1,6 +1,6 @@
-import type { TaskId, TaskState } from '@mozart/contracts';
+import type { StorageQuery, TaskId, TaskMatch, TaskState } from '@mozart/contracts';
 import { Mutex, type MutexInterface } from 'async-mutex';
-import { type AdapterLease, NodeCrashedError, type StorageAdapter } from './storage-adapter';
+import { type AdapterLease, matchesQuery, NodeCrashedError, type StorageAdapter } from './storage-adapter';
 
 /** In-memory S: a map plus one mutex per task for readExclusive. */
 export class InMemoryStorageAdapter implements StorageAdapter {
@@ -9,6 +9,14 @@ export class InMemoryStorageAdapter implements StorageAdapter {
 
   read(taskId: TaskId): Promise<TaskState | null> {
     return Promise.resolve(this.clone(this.store.get(taskId)));
+  }
+
+  find(query: StorageQuery): Promise<TaskMatch[]> {
+    const matches: TaskMatch[] = [];
+    for (const [taskId, data] of this.store) {
+      if (matchesQuery(data, query)) matches.push({ taskId, data: this.clone(data)! });
+    }
+    return Promise.resolve(matches);
   }
 
   save(taskId: TaskId, data: TaskState): Promise<void> {

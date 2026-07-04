@@ -1,3 +1,3 @@
 export * from './baseline';
-export * from './echo';
+export * from './protocol';
 export * from './registry';

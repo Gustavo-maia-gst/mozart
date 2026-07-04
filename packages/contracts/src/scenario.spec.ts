@@ -7,20 +7,16 @@ import { scenarioSchema } from './scenario';
 const scenariosDir = join(__dirname, '..', '..', '..', 'scenarios');
 
 describe('scenarioSchema', () => {
-  it('parses echo-smoke.yaml', () => {
-    const raw: unknown = parse(readFileSync(join(scenariosDir, 'echo-smoke.yaml'), 'utf8'));
+  it('parses baseline.yaml', () => {
+    const raw: unknown = parse(readFileSync(join(scenariosDir, 'baseline.yaml'), 'utf8'));
     const scenario = scenarioSchema.parse(raw);
 
-    expect(scenario.name).toBe('echo-smoke');
-    expect(scenario.seed).toBe('42'); // number coerced to string
-    expect(scenario.nodes.map((n) => n.id)).toEqual(['n1', 'n2']);
-    expect(scenario.dag.tasks[1]?.dependsOn).toEqual(['t1']);
-    expect(scenario.latency['worker.taskDuration']).toEqual({
-      distribution: 'lognormal',
-      mu: 6.9,
-      sigma: 0.5,
-    });
-    expect(scenario.faults[0]).toMatchObject({ action: 'killNode', node: 'n2' });
+    expect(scenario.name).toBe('baseline');
+    expect(scenario.seed).toBe('1'); // number coerced to string
+    expect(scenario.protocol).toBe('baseline');
+    expect(scenario.nodes.map((n) => n.id)).toEqual(['n1']);
+    expect(scenario.dag.tasks.map((t) => t.id)).toEqual(['a', 'b', 'c', 'd']);
+    expect(scenario.dag.tasks[3]?.dependsOn).toEqual(['b', 'c']);
     expect(scenario.transport.ackTimeoutMs).toBe(2000);
   });
 

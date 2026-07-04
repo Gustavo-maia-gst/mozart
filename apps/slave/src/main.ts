@@ -4,9 +4,12 @@ async function bootstrap(): Promise<void> {
   const nodeId = required('MOZART_NODE_ID');
   const protocol = required('MOZART_PROTOCOL');
   const runId = required('MOZART_RUN_ID');
+  // The coordinator's own name drives the OTel service, so each shows up as its
+  // own service in Jaeger. Falls back to the node id when unnamed.
+  const name = process.env.MOZART_NODE_NAME || nodeId;
 
   const telemetry = initTelemetry({
-    serviceName: 'mozart-slave',
+    serviceName: name,
     attributes: { 'mozart.node_id': nodeId, 'mozart.run_id': runId },
     processor: process.env.MOZART_OTEL_PROCESSOR as 'batch' | 'simple' | undefined,
   });

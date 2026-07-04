@@ -22,7 +22,7 @@ async function bootstrap(): Promise<void> {
   // Telemetry first: instrumentation must patch libraries before the app graph
   // (which pulls in pg) is imported.
   const telemetry = initTelemetry({
-    serviceName: 'mozart-master',
+    serviceName: 'harness',
     attributes: { 'mozart.run_id': runId },
     otlpUrl: env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
     processor: env.MOZART_OTEL_PROCESSOR,
@@ -43,7 +43,7 @@ async function bootstrap(): Promise<void> {
 
     console.log(JSON.stringify(summary, null, 2));
 
-    console.log('Jaeger: http://localhost:16686/search?service=mozart-master');
+    console.log('Jaeger: http://localhost:16686/search?service=harness');
   } finally {
     await app.close();
     await telemetry.shutdown();

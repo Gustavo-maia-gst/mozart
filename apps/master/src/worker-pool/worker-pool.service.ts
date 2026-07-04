@@ -1,14 +1,12 @@
 import { type NodeId, type Scenario, type TaskId, WORKER_NODE_ID, WORKER_TOPICS } from '@mozart/contracts';
 import type { LatencyModel } from '@mozart/latency';
-import { ATTR, injectActiveContext, runWithExtractedContext, TRACER_NAME } from '@mozart/telemetry';
+import { annotateSpan, ATTR, injectActiveContext, runWithExtractedContext, Trace } from '@mozart/telemetry';
 import { Inject, Injectable } from '@nestjs/common';
-import { context, SpanKind, trace } from '@opentelemetry/api';
 import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
 import { LATENCY_MODEL, SCENARIO, SCHEDULER } from '../tokens';
 import { TransportService } from '../transport/transport.service';
 
-const tracer = trace.getTracer(TRACER_NAME);
 const TASK_DURATION = 'worker.taskDuration';
 
 /**
@@ -54,22 +52,20 @@ export class WorkerPoolService {
   private complete(nodeId: NodeId, taskId: TaskId, startCtx: Record<string, string>): void {
     this.running.delete(taskId);
     const failed = this.failNext.delete(taskId);
+    // The execute span descends from the caller's start context so the
+    // completion event links back to the coordinator that started the task.
+    runWithExtractedContext(startCtx, () => this.execute(nodeId, taskId, failed));
+  }
 
-    runWithExtractedContext(startCtx, () => {
-      const span = tracer.startSpan('worker.execute', {
-        kind: SpanKind.INTERNAL,
-        attributes: { [ATTR.taskId]: taskId, [ATTR.nodeId]: nodeId },
-      });
-      context.with(trace.setSpan(context.active(), span), () => {
-        const topic = failed ? WORKER_TOPICS.failed : WORKER_TOPICS.completed;
-        this.transport.publish(WORKER_NODE_ID, nodeId, topic, { taskId });
-        this.events.record({
-          type: failed ? 'worker.failed' : 'worker.completed',
-          nodeId,
-          taskId,
-        });
-        span.end();
-      });
+  @Trace({ name: 'worker.execute' })
+  private execute(nodeId: NodeId, taskId: TaskId, failed: boolean): void {
+    annotateSpan({ [ATTR.taskId]: taskId, [ATTR.nodeId]: nodeId });
+    const topic = failed ? WORKER_TOPICS.failed : WORKER_TOPICS.completed;
+    this.transport.publish(WORKER_NODE_ID, nodeId, topic, { taskId });
+    this.events.record({
+      type: failed ? 'worker.failed' : 'worker.completed',
+      nodeId,
+      taskId,
     });
   }
 

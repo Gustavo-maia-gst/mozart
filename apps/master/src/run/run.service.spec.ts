@@ -9,7 +9,7 @@ import { RunService } from './run.service';
 const scenario: Scenario = {
   name: 'unit',
   seed: '1',
-  protocol: 'echo',
+  protocol: 'baseline',
   nodes: [{ id: 'n1' }, { id: 'n2' }],
   dag: { tasks: [{ id: 't1', dependsOn: [] }] },
   storage: { adapter: 'in-memory' },

@@ -1,4 +1,4 @@
-import type { TaskId, TaskState } from '@mozart/contracts';
+import type { StorageQuery, TaskId, TaskMatch, TaskState } from '@mozart/contracts';
 import { Pool } from 'pg';
 import { type AdapterLease, NodeCrashedError, type StorageAdapter } from './storage-adapter';
 
@@ -36,6 +36,16 @@ export class PostgresStorageAdapter implements StorageAdapter {
   async read(taskId: TaskId): Promise<TaskState | null> {
     const r = await this.pool.query<{ data: TaskState }>('select data from task_state where task_id = $1', [taskId]);
     return r.rows[0]?.data ?? null;
+  }
+
+  async find(query: StorageQuery): Promise<TaskMatch[]> {
+    // jsonb containment (@>) is attribute-equality for the given keys and can
+    // use a GIN index on data; an empty query contains everything.
+    const r = await this.pool.query<{ task_id: TaskId; data: TaskState }>(
+      'select task_id, data from task_state where data @> $1',
+      [query],
+    );
+    return r.rows.map((row) => ({ taskId: row.task_id, data: row.data }));
   }
 
   async save(taskId: TaskId, data: TaskState): Promise<void> {

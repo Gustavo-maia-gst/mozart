@@ -1,12 +1,6 @@
-import {
-  type Attributes,
-  type Link,
-  type Span,
-  SpanKind,
-  SpanStatusCode,
-  type Tracer,
-  trace,
-} from '@opentelemetry/api';
+import { type Attributes, type Span, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
+import { currentScope } from './context-store';
+import { TRACER_NAME } from './telemetry';
 
 /** Mozart span/attribute keys (mixed with standard messaging.* where they exist). */
 export const ATTR = {
@@ -21,48 +15,111 @@ export const ATTR = {
   topic: 'messaging.destination.name',
 } as const;
 
-export interface SpanOptions {
+export interface TraceOptions {
+  /**
+   * Explicit span name. On a method it is the full span name; on a class it is
+   * the prefix used for methods that don't set their own name (default: the
+   * class name). Methods without a name fall back to `<prefix>.<method>`.
+   */
+  name?: string;
   kind?: SpanKind;
-  attributes?: Attributes;
-  links?: Link[];
 }
 
-/**
- * Runs `fn` inside an active span, recording exceptions and setting status.
- * The span becomes the active context for anything `fn` awaits.
- */
-export async function withSpan<T>(
-  tracer: Tracer,
-  name: string,
-  opts: SpanOptions,
-  fn: (span: Span) => Promise<T>,
-): Promise<T> {
-  return tracer.startActiveSpan(
-    name,
-    { kind: opts.kind ?? SpanKind.INTERNAL, attributes: opts.attributes, links: opts.links },
-    async (span) => {
-      try {
-        const result = await fn(span);
-        span.setStatus({ code: SpanStatusCode.OK });
-        return result;
-      } catch (err) {
-        span.recordException(err as Error);
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: err instanceof Error ? err.message : String(err),
-        });
-        throw err;
-      } finally {
-        span.end();
-      }
-    },
-  );
+/** Adds attributes to the currently active span (e.g. per-call dynamic values). */
+export function annotateSpan(attributes: Attributes): void {
+  trace.getActiveSpan()?.setAttributes(attributes);
 }
 
 /** Trace/span id of the currently active span, for stamping event-log records. */
 export function activeIds(): { traceId?: string; spanId?: string } {
   const ctx = trace.getActiveSpan()?.spanContext();
   return ctx ? { traceId: ctx.traceId, spanId: ctx.spanId } : {};
+}
+
+type AnyFn = (...args: unknown[]) => unknown;
+
+function message(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/** Stamp the ambient scope (nodeId/taskId) onto a span, when present. */
+function stampScope(span: Span): void {
+  const { nodeId, taskId } = currentScope();
+  if (nodeId) span.setAttribute(ATTR.nodeId, nodeId);
+  if (taskId) span.setAttribute(ATTR.taskId, taskId);
+}
+
+/** Wraps a method so each call runs inside an active span. */
+function wrap(original: AnyFn, spanName: string, kind?: SpanKind): AnyFn {
+  return function (this: unknown, ...args: unknown[]): unknown {
+    return trace
+      .getTracer(TRACER_NAME)
+      .startActiveSpan(spanName, { kind: kind ?? SpanKind.INTERNAL }, (span) => {
+        stampScope(span);
+        try {
+          const result = original.apply(this, args);
+          if (result instanceof Promise) {
+            return result.then(
+              (value) => {
+                span.setStatus({ code: SpanStatusCode.OK });
+                span.end();
+                return value;
+              },
+              (err: unknown) => {
+                span.recordException(err as Error);
+                span.setStatus({ code: SpanStatusCode.ERROR, message: message(err) });
+                span.end();
+                throw err;
+              },
+            );
+          }
+          span.setStatus({ code: SpanStatusCode.OK });
+          span.end();
+          return result;
+        } catch (err) {
+          span.recordException(err as Error);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: message(err) });
+          span.end();
+          throw err;
+        }
+      });
+  };
+}
+
+function decorateMethod(target: object, key: string | symbol, descriptor: PropertyDescriptor, opts: TraceOptions): void {
+  if (typeof descriptor.value !== 'function') return;
+  const className = (target as { constructor: { name: string } }).constructor.name;
+  const spanName = opts.name ?? `${className}.${String(key)}`;
+  descriptor.value = wrap(descriptor.value as AnyFn, spanName, opts.kind);
+}
+
+function decorateClass(ctor: { name: string; prototype: object }, opts: TraceOptions): void {
+  const prefix = opts.name ?? ctor.name;
+  for (const key of Object.getOwnPropertyNames(ctor.prototype)) {
+    if (key === 'constructor') continue;
+    const descriptor = Object.getOwnPropertyDescriptor(ctor.prototype, key);
+    if (!descriptor || typeof descriptor.value !== 'function') continue;
+    descriptor.value = wrap(descriptor.value as AnyFn, `${prefix}.${key}`, opts.kind);
+    Object.defineProperty(ctor.prototype, key, descriptor);
+  }
+}
+
+/**
+ * Opens an active span around a method (or every method of a class). The span
+ * kind and name come from `opts`; `nodeId`/`taskId` are stamped from the
+ * ambient trace scope (see `runInTraceScope`). Awaited work inherits the span
+ * as parent, so blocking calls nest correctly.
+ */
+export function Trace(
+  opts: TraceOptions = {},
+): (target: object, propertyKey?: string | symbol, descriptor?: PropertyDescriptor) => void {
+  return (target, propertyKey, descriptor) => {
+    if (propertyKey !== undefined && descriptor) {
+      decorateMethod(target, propertyKey, descriptor, opts);
+      return;
+    }
+    decorateClass(target as { name: string; prototype: object }, opts);
+  };
 }
 
 export { SpanKind } from '@opentelemetry/api';

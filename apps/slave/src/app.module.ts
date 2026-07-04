@@ -14,7 +14,7 @@ export class SlaveModule {
     return {
       module: SlaveModule,
       global: true, // NODE_ID/PROTOCOL_NAME/RUN_ID visible to ProtocolHostModule
-      imports: [ProtocolHostModule],
+      imports: [ProtocolHostModule.forProtocol(params.protocol)],
       providers: [
         { provide: NODE_ID, useValue: params.nodeId },
         { provide: PROTOCOL_NAME, useValue: params.protocol },

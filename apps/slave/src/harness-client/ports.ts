@@ -3,70 +3,73 @@ import type {
   Json,
   NodeId,
   StoragePort,
+  StorageQuery,
   TaskId,
+  TaskMatch,
   TaskState,
   TransportPort,
   WorkerPoolPort,
 } from '@mozart/contracts';
 import type { IpcClient } from '@mozart/ipc';
-import { ATTR, TRACER_NAME, withSpan } from '@mozart/telemetry';
+import { annotateSpan, ATTR, SpanKind, Trace } from '@mozart/telemetry';
 import { Inject, Injectable } from '@nestjs/common';
-import { SpanKind, trace } from '@opentelemetry/api';
 import { IPC_CLIENT } from '../tokens';
 
-const tracer = trace.getTracer(TRACER_NAME);
-const CLIENT = { kind: SpanKind.CLIENT } as const;
-
-/** All ports are thin, traced wrappers over the master RPC. */
+/**
+ * All ports are thin, traced wrappers over the master RPC. `@Trace` opens the
+ * span; `nodeId`/`taskId` are stamped from the ambient trace scope the harness
+ * opens per dispatch, so callers don't thread them through.
+ */
 
 @Injectable()
+@Trace({ name: 'transport', kind: SpanKind.PRODUCER })
 export class TransportClient implements TransportPort {
   constructor(@Inject(IPC_CLIENT) private readonly ipc: IpcClient) {}
 
   async publish(to: NodeId, topic: string, body: Json): Promise<void> {
-    await withSpan(tracer, 'transport.publish', { kind: SpanKind.PRODUCER, attributes: { [ATTR.topic]: topic } }, () =>
-      this.ipc.call('transport.publish', { to, topic, body }),
-    );
+    annotateSpan({ [ATTR.topic]: topic });
+    await this.ipc.call('transport.publish', { to, topic, body });
   }
 }
 
 @Injectable()
+@Trace({ name: 'worker', kind: SpanKind.CLIENT })
 export class WorkerPoolClient implements WorkerPoolPort {
   constructor(@Inject(IPC_CLIENT) private readonly ipc: IpcClient) {}
 
   async start(taskId: TaskId): Promise<void> {
-    await withSpan(tracer, 'worker.start', { ...CLIENT, attributes: { [ATTR.taskId]: taskId } }, () =>
-      this.ipc.call('worker.start', { taskId }),
-    );
+    annotateSpan({ [ATTR.taskId]: taskId });
+    await this.ipc.call('worker.start', { taskId });
   }
 }
 
 @Injectable()
+@Trace({ name: 'storage', kind: SpanKind.CLIENT })
 export class StorageClient implements StoragePort {
   constructor(@Inject(IPC_CLIENT) private readonly ipc: IpcClient) {}
 
-  read(taskId: TaskId): Promise<TaskState | null> {
-    return withSpan(tracer, 'storage.read', { ...CLIENT, attributes: { [ATTR.taskId]: taskId } }, () =>
-      this.ipc.call('storage.read', { taskId }).then((r) => r.data),
-    );
+  async read(taskId: TaskId): Promise<TaskState | null> {
+    const { data } = await this.ipc.call('storage.read', { taskId });
+    return data;
   }
 
-  save(taskId: TaskId, data: TaskState): Promise<void> {
-    return withSpan(tracer, 'storage.save', { ...CLIENT, attributes: { [ATTR.taskId]: taskId } }, async () => {
-      await this.ipc.call('storage.save', { taskId, data });
-    });
+  async find(query: StorageQuery): Promise<TaskMatch[]> {
+    const { matches } = await this.ipc.call('storage.find', { query });
+    return matches;
   }
 
-  readExclusive(taskId: TaskId): Promise<ExclusiveRead> {
-    return withSpan(tracer, 'storage.readExclusive', { ...CLIENT, attributes: { [ATTR.taskId]: taskId } }, () =>
-      this.ipc
-        .call('storage.readExclusive', { taskId })
-        .then((r) => new RemoteExclusiveRead(this.ipc, r.leaseId, r.data)),
-    );
+  async save(taskId: TaskId, data: TaskState): Promise<void> {
+    await this.ipc.call('storage.save', { taskId, data });
+  }
+
+  async readExclusive(taskId: TaskId): Promise<ExclusiveRead> {
+    const r = await this.ipc.call('storage.readExclusive', { taskId });
+    return new RemoteExclusiveRead(this.ipc, r.leaseId, r.data);
   }
 }
 
 /** Handle over a held lease; save/release map to lease RPCs. */
+@Trace({ name: 'storage.lease', kind: SpanKind.CLIENT })
 class RemoteExclusiveRead implements ExclusiveRead {
   constructor(
     private readonly ipc: IpcClient,
@@ -74,15 +77,11 @@ class RemoteExclusiveRead implements ExclusiveRead {
     readonly data: TaskState | null,
   ) {}
 
-  save(data: TaskState): Promise<void> {
-    return withSpan(tracer, 'storage.lease.save', CLIENT, async () => {
-      await this.ipc.call('storage.lease.save', { leaseId: this.leaseId, data });
-    });
+  async save(data: TaskState): Promise<void> {
+    await this.ipc.call('storage.lease.save', { leaseId: this.leaseId, data });
   }
 
-  release(): Promise<void> {
-    return withSpan(tracer, 'storage.lease.release', CLIENT, async () => {
-      await this.ipc.call('storage.lease.release', { leaseId: this.leaseId });
-    });
+  async release(): Promise<void> {
+    await this.ipc.call('storage.lease.release', { leaseId: this.leaseId });
   }
 }

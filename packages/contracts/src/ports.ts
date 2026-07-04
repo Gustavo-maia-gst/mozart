@@ -4,6 +4,19 @@ import type { Json, JsonObject } from './json';
 /** State persisted for a task in the shared storage S. */
 export type TaskState = JsonObject;
 
+/** A task's stored state together with its id — one hit of a storage query. */
+export interface TaskMatch {
+  taskId: TaskId;
+  data: TaskState;
+}
+
+/**
+ * Equality filter over stored task state: an AND of top-level `attribute ===
+ * value` predicates. An empty query matches every task. Values are compared by
+ * equality; intended for scalar attributes (`{ status: 'done' }`).
+ */
+export type StorageQuery = JsonObject;
+
 /**
  * A message pushed to a protocol handler. Deliveries come from the harness
  * transport (at-least-once): the same `messageId` may arrive more than once,
@@ -24,7 +37,7 @@ export interface Delivery {
 /**
  * Async at-least-once messaging, FIFO per (from, to) logical channel,
  * ack-based redelivery. Consumption is push-based: the harness invokes
- * `ProtocolSpi.onMessage`; the ack is issued when the handler resolves.
+ * `Protocol.onMessage`; the ack is issued when the handler resolves.
  */
 export interface TransportPort {
   publish(to: NodeId, topic: string, body: Json): Promise<void>;
@@ -36,6 +49,12 @@ export interface TransportPort {
  */
 export interface StoragePort {
   read(taskId: TaskId): Promise<TaskState | null>;
+  /**
+   * Snapshot query: return every task whose state matches `query` by equality
+   * on each listed attribute (see {@link StorageQuery}). No locking; like
+   * `read`, it just blocks under an outage. Order is unspecified.
+   */
+  find(query: StorageQuery): Promise<TaskMatch[]>;
   /**
    * Loads the state of `taskId` under mutual exclusion. Blocks until the
    * lock is acquired. The lock is released by `save`/`release` on the handle,

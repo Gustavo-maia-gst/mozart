@@ -2,7 +2,6 @@ import { trace } from '@opentelemetry/api';
 import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { injectActiveContext, runWithExtractedContext } from './propagation';
-import { withSpan } from './spans';
 
 const exporter = new InMemorySpanExporter();
 
@@ -17,8 +16,9 @@ describe('trace-context propagation across an envelope carrier', () => {
     const carrier: Record<string, string> = {};
 
     // Producer side: active span injects into the carrier.
-    await withSpan(tracer, 'producer', {}, async () => {
+    tracer.startActiveSpan('producer', (span) => {
       injectActiveContext(carrier);
+      span.end();
     });
     expect(carrier.traceparent).toBeDefined();
 

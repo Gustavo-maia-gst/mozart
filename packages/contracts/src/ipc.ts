@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { type Json, jsonObjectSchema, jsonSchema } from './json';
-import type { Delivery, TaskState } from './ports';
+import type { Delivery, StorageQuery, TaskMatch, TaskState } from './ports';
 import type { ScenarioInfo } from './scenario';
 
 /**
@@ -52,6 +52,7 @@ export const rpcPayloadSchemas = {
   }),
   'transport.ack': z.object({ deliveryId: z.string().min(1) }),
   'storage.read': z.object({ taskId: z.string().min(1) }),
+  'storage.find': z.object({ query: jsonObjectSchema }),
   'storage.readExclusive': z.object({ taskId: z.string().min(1) }),
   'storage.save': z.object({ taskId: z.string().min(1), data: jsonObjectSchema }),
   'storage.lease.save': z.object({ leaseId: z.string().min(1), data: jsonObjectSchema }),
@@ -70,6 +71,7 @@ export interface RpcContracts {
   };
   'transport.ack': { req: { deliveryId: string }; res: Record<string, never> };
   'storage.read': { req: { taskId: string }; res: { data: TaskState | null } };
+  'storage.find': { req: { query: StorageQuery }; res: { matches: TaskMatch[] } };
   'storage.readExclusive': {
     req: { taskId: string };
     res: { leaseId: string; data: TaskState | null };

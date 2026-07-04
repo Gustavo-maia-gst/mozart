@@ -7,6 +7,7 @@ export const KNOWN_LATENCY_ACTIONS = [
   'storage.read',
   'storage.readExclusive',
   'storage.save',
+  'storage.find',
   'worker.taskDuration',
 ] as const;
 
@@ -83,7 +84,8 @@ export const scenarioSchema = z.object({
   name: z.string().min(1),
   seed: z.union([z.string(), z.number()]).transform(String),
   protocol: z.string().min(1),
-  nodes: z.array(z.object({ id: nodeIdSchema })).min(1),
+  /** Each coordinator's `name` drives its OTel service (defaults to `id`). */
+  nodes: z.array(z.object({ id: nodeIdSchema, name: z.string().min(1).optional() })).min(1),
   dag: dagSchema,
   storage: z.discriminatedUnion('adapter', [
     z.object({ adapter: z.literal('in-memory') }),

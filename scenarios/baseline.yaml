@@ -3,7 +3,7 @@
 name: baseline
 seed: 1
 protocol: baseline
-nodes: [{ id: n1 }]
+nodes: [{ id: n1, name: coordinator }]
 dag:
   tasks:
     - { id: a, costMs: 50 }

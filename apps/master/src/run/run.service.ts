@@ -1,14 +1,12 @@
 import type { Scenario } from '@mozart/contracts';
-import { ATTR, TRACER_NAME, withSpan } from '@mozart/telemetry';
+import { annotateSpan, ATTR, Trace } from '@mozart/telemetry';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { trace } from '@opentelemetry/api';
 import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
 import { FaultInjectorService } from '../fault/fault-injector.service';
 import { ProcessManagerService } from '../ipc-server/process-manager.service';
 import { RUN_ID, SCENARIO, SCHEDULER } from '../tokens';
 
-const tracer = trace.getTracer(TRACER_NAME);
 const READY_TIMEOUT_MS = 10_000;
 const DRAIN_MS = 300;
 
@@ -43,11 +41,7 @@ export class RunService {
     this.events.record({ type: 'run.started', data: { scenario: this.scenario.name } });
     this.logger.log(`run ${this.runId} — scenario "${this.scenario.name}"`);
 
-    if (!opts.dryRun) {
-      await withSpan(tracer, `run ${this.scenario.name}`, { attributes: { [ATTR.runId]: this.runId } }, () =>
-        this.execute(),
-      );
-    }
+    if (!opts.dryRun) await this.execute();
 
     this.events.record({ type: 'run.finished' });
     const summary: RunSummary = {
@@ -60,7 +54,9 @@ export class RunService {
     return summary;
   }
 
+  @Trace({ name: 'run' })
   private async execute(): Promise<void> {
+    annotateSpan({ [ATTR.runId]: this.runId });
     this.pm.spawnAll();
     await this.pm.awaitAllReady(READY_TIMEOUT_MS);
     this.logger.log('all nodes ready — activating protocol');

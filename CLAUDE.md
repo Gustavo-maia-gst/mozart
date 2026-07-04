@@ -13,7 +13,7 @@ pnpm build                  # tsc -b (project references)
 pnpm test                   # vitest, unit
 pnpm test:integration      # MOZART_INTEGRATION=1 — inclui testes que precisam do postgres
 pnpm lint
-pnpm demo                   # roda scenarios/echo-smoke.yaml
+pnpm demo                   # roda scenarios/baseline.yaml
 ```
 
 ## Arquitetura
@@ -25,12 +25,13 @@ pnpm demo                   # roda scenarios/echo-smoke.yaml
   O master é _silencioso_: não participa do protocolo.
 - **`apps/slave`** — runner genérico de protocolo (NestJS). Stateless. Todo efeito
   colateral (transport/W/S) atravessa IPC até o master.
-- **`packages/contracts`** — ports (TransportPort/StoragePort/WorkerPoolPort),
-  ProtocolSpi, IpcFrame, eventos, schema zod de cenário. Depende só de zod.
+- **`packages/contracts`** — ports (TransportPort/StoragePort/WorkerPoolPort), tokens de DI
+  (STORAGE_PORT/…/PROTOCOL_LOGGER/PROTOCOL), Graph, IpcFrame, eventos, schema zod de cenário.
 - **`packages/ipc`** — RPC tipado fino sobre o canal IPC nativo do `child_process.fork`.
 - **`packages/telemetry`** — bootstrap OTel + inject/extract de trace-context em envelopes.
 - **`packages/latency`** — RNG seedado, um stream por tipo de ação, distribuições d3-random.
-- **`packages/protocols`** — implementações de ProtocolSpi (echo é o smoke test).
+- **`packages/protocols`** — classe abstrata `Protocol` (portas injetadas por propriedade via
+  Nest) + implementações. `baseline` é o protocolo centralizado de referência.
 
 Direção de dependência: `apps → packages`; `packages → contracts` apenas.
 

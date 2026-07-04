@@ -1,16 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { type ChannelKey, channelKey, type Delivery, type Json, type NodeId, type Scenario } from '@mozart/contracts';
 import type { LatencyModel } from '@mozart/latency';
-import { ATTR, injectActiveContext, runWithExtractedContext, TRACER_NAME } from '@mozart/telemetry';
+import { annotateSpan, ATTR, injectActiveContext, runWithExtractedContext, SpanKind, Trace } from '@mozart/telemetry';
 import { Inject, Injectable } from '@nestjs/common';
-import { context, SpanKind, trace } from '@opentelemetry/api';
 import type { Clock, Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
 import { CLOCK, LATENCY_MODEL, SCENARIO, SCHEDULER } from '../tokens';
 import { Channel, type QueuedMessage } from './channel';
 import { DELIVERY_SINK, type DeliverySink, NetworkState } from './delivery-sink';
 
-const tracer = trace.getTracer(TRACER_NAME);
 const DELIVER_LATENCY = 'transport.deliver';
 
 /**
@@ -136,31 +134,7 @@ export class TransportService {
 
     // Deliver span descends from the publish context; the delivery carries the
     // deliver-span context so the slave's onMessage becomes its child.
-    runWithExtractedContext(head.publishTraceCtx, () => {
-      const span = tracer.startSpan(redelivery ? 'transport.redeliver' : 'transport.deliver', {
-        kind: SpanKind.PRODUCER,
-        attributes: {
-          [ATTR.channel]: ch.key,
-          [ATTR.messageId]: head.messageId,
-          [ATTR.topic]: head.topic,
-          [ATTR.attempt]: head.attempts,
-        },
-      });
-      context.with(trace.setSpan(context.active(), span), () => {
-        const delivery = this.buildDelivery(head, deliveryId);
-        this.events.record({
-          type: redelivery ? 'transport.redelivered' : 'transport.delivered',
-          channel: ch.key,
-          messageId: head.messageId,
-          deliveryId,
-          attempt: head.attempts,
-          data: { topic: head.topic },
-        });
-        const ok = this.sink.deliver(head.to, delivery);
-        span.end();
-        if (ok && !redelivery) this.emitDuplicates(ch, head);
-      });
-    });
+    runWithExtractedContext(head.publishTraceCtx, () => this.emitDelivery(ch, head, deliveryId, redelivery));
 
     // Track outstanding + arm the visibility timer regardless of reachability:
     // if the node is down the timer simply retries later.
@@ -169,6 +143,29 @@ export class TransportService {
       timer: this.scheduler.after(this.ackTimeoutMs, () => this.onVisibilityTimeout(ch)),
     };
     this.outstanding.set(deliveryId, ch);
+  }
+
+  @Trace({ name: 'transport.deliver', kind: SpanKind.PRODUCER })
+  private emitDelivery(ch: Channel, head: QueuedMessage, deliveryId: string, redelivery: boolean): void {
+    annotateSpan({
+      [ATTR.channel]: ch.key,
+      [ATTR.messageId]: head.messageId,
+      [ATTR.topic]: head.topic,
+      [ATTR.attempt]: head.attempts,
+    });
+    // buildDelivery captures this active span, so the slave's onMessage nests
+    // under it — one trace tree per message across the deliver/redeliver hops.
+    const delivery = this.buildDelivery(head, deliveryId);
+    this.events.record({
+      type: redelivery ? 'transport.redelivered' : 'transport.delivered',
+      channel: ch.key,
+      messageId: head.messageId,
+      deliveryId,
+      attempt: head.attempts,
+      data: { topic: head.topic },
+    });
+    const ok = this.sink.deliver(head.to, delivery);
+    if (ok && !redelivery) this.emitDuplicates(ch, head);
   }
 
   private onVisibilityTimeout(ch: Channel): void {

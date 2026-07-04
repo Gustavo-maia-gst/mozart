@@ -21,6 +21,7 @@ export const EVENT_TYPES = [
   'transport.duplicated',
   'transport.blocked',
   'storage.read',
+  'storage.find',
   'storage.readExclusive.requested',
   'storage.readExclusive.acquired',
   'storage.save',

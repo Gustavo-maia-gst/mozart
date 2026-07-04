@@ -1,13 +1,13 @@
-import { Injectable } from '@nestjs/common';
 import {
   type Delivery,
   type Graph,
   type GraphId,
   type JsonObject,
-  Protocol,
   type TaskId,
   WORKER_TOPICS,
 } from '@mozart/contracts';
+import { Injectable } from '@nestjs/common';
+import { Protocol } from './protocol';
 
 /** In-memory bookkeeping for one graph's execution. */
 interface GraphRuntime {
@@ -36,17 +36,17 @@ export class BaselineProtocol extends Protocol {
 
   /** Baseline's persistence layout: the entire graph under one key. */
   async persistGraph(graph: Graph): Promise<void> {
-    await this.ctx.storage.save(this.key(graph.id), { graph } as unknown as JsonObject);
-    this.ctx.log.info('graph persisted', { graphId: graph.id, tasks: graph.tasks.length });
+    await this.storage.save(this.key(graph.id), { graph } as unknown as JsonObject);
+    this.log.info('graph persisted', { graphId: graph.id, tasks: graph.tasks.length });
   }
 
   async startGraph(graphId: GraphId): Promise<void> {
-    const stored = (await this.ctx.storage.read(this.key(graphId))) as { graph?: Graph } | null;
+    const stored = (await this.storage.read(this.key(graphId))) as { graph?: Graph } | null;
     const graph = stored?.graph;
     if (!graph) throw new Error(`graph ${graphId} is not persisted`);
 
     this.runtimes.set(graphId, this.buildRuntime(graph, graphId));
-    this.ctx.log.info('graph started', { graphId });
+    this.log.info('graph started', { graphId });
     for (const task of graph.tasks) {
       if (task.dependsOn.length === 0) await this.startTask(task.id);
     }
@@ -57,7 +57,7 @@ export class BaselineProtocol extends Protocol {
     const taskId = (message.body as { taskId?: TaskId }).taskId;
     if (!taskId) return;
     if (message.topic === WORKER_TOPICS.failed) {
-      this.ctx.log.warn('task failed', { taskId });
+      this.log.warn('task failed', { taskId });
       return;
     }
     if (message.topic !== WORKER_TOPICS.completed) return;
@@ -76,7 +76,7 @@ export class BaselineProtocol extends Protocol {
       if (left === 0) await this.startTask(dependent);
     }
     if (runtime.remaining === 0) {
-      this.ctx.log.info('graph complete', { graphId: this.taskGraph.get(taskId) ?? null });
+      this.log.info('graph complete', { graphId: this.taskGraph.get(taskId) ?? null });
     }
   }
 
@@ -96,8 +96,8 @@ export class BaselineProtocol extends Protocol {
   }
 
   private async startTask(taskId: TaskId): Promise<void> {
-    this.ctx.log.info('start task', { taskId });
-    await this.ctx.workers.start(taskId);
+    this.log.info('start task', { taskId });
+    await this.workers.start(taskId);
   }
 
   private runtimeOf(taskId: TaskId): GraphRuntime | undefined {

@@ -1,6 +1,25 @@
-import type { TaskId, TaskState } from '@mozart/contracts';
+import type { Json, StorageQuery, TaskId, TaskMatch, TaskState } from '@mozart/contracts';
 
 export const STORAGE_ADAPTER = Symbol('STORAGE_ADAPTER');
+
+/** True iff `data` equals `query` on every listed attribute (empty ⇒ always). */
+export function matchesQuery(data: TaskState, query: StorageQuery): boolean {
+  return Object.entries(query).every(([key, value]) => jsonEqual(data[key], value));
+}
+
+/** Structural equality for JSON values (order-insensitive over object keys). */
+function jsonEqual(a: Json | undefined, b: Json | undefined): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((el, i) => jsonEqual(el, b[i]));
+  }
+  const ak = Object.keys(a);
+  const bk = Object.keys(b);
+  if (ak.length !== bk.length) return false;
+  return ak.every((k) => k in b && jsonEqual(a[k], b[k]));
+}
 
 /** Thrown when a held/pending lock is force-released because its node crashed. */
 export class NodeCrashedError extends Error {
@@ -26,6 +45,8 @@ export interface AdapterLease {
  */
 export interface StorageAdapter {
   read(taskId: TaskId): Promise<TaskState | null>;
+  /** Return every stored task whose state matches `query` by attribute equality. */
+  find(query: StorageQuery): Promise<TaskMatch[]>;
   save(taskId: TaskId, data: TaskState): Promise<void>;
   /**
    * Acquire the exclusive lock for `taskId`, blocking until granted. If

@@ -7,7 +7,7 @@ model; the harness isolates them from the outside world, injects faults, and ins
 100% of interactions so their correctness and coordination cost can be measured and compared.
 
 This repository is **milestone 1: the harness itself** — the "world" the protocols run in.
-A trivial `echo` protocol ships as a smoke test; real protocols come next.
+A centralized `baseline` protocol ships as the reference; distributed protocols come next.
 
 ## Model (fixed for all protocols)
 
@@ -45,24 +45,31 @@ docker compose up -d          # Jaeger (UI :16686) + Postgres (:5432)
 pnpm install && pnpm build
 pnpm test                     # unit + component tests
 pnpm test:integration         # + Postgres storage tests (needs the DB)
-pnpm demo                     # runs scenarios/echo-chaos.yaml
+pnpm demo                     # runs scenarios/baseline.yaml
 ```
 
-`pnpm demo` boots two `echo` nodes, kills one mid-run, and you can watch the redelivery
-recover in the event log (`runs/<runId>/events.jsonl`) and the full cross-process trace in
-Jaeger (`http://localhost:16686`, service `mozart-master`).
+`pnpm demo` boots the `baseline` coordinator over a diamond DAG (`a -> {b,c} -> d`), which
+it loads into memory and drives to completion. Watch it in the event log
+(`runs/<runId>/events.jsonl`) and as one cross-process trace in Jaeger
+(`http://localhost:16686`, service `mozart-master`).
 
 ## Scenarios
 
 A scenario file (`scenarios/*.yaml`) declares _what to run_: nodes, the DAG, per-action
 latency distributions (mean/variance), a fault schedule, an RNG seed, and the end
 condition. Environment config declares _where things are_ (OTLP endpoint, Postgres URL,
-slave entrypoint). See `scenarios/echo-chaos.yaml`.
+slave entrypoint). See `scenarios/baseline.yaml`.
 
 ## Writing a protocol
 
-Implement `ProtocolSpi` (`onActivate` / `onMessage` / optional `onDeactivate`) and register
-it in `packages/protocols/src/registry.ts`. Handlers get a `ProtocolContext` exposing the
-`transport`, `storage` and `workers` ports. **`onMessage` resolving is the ack** — a
-rejection (or a crash) triggers redelivery, so handlers must be idempotent. See
-`packages/protocols/src/echo.ts`.
+Extend the abstract `Protocol` class and register it in
+`packages/protocols/src/registry.ts`. Nest injects the ports as properties
+(`this.storage` / `this.transport` / `this.workers` / `this.log`), so a protocol only
+implements three operations:
+
+- `persistGraph(graph)` — how the graph is stored in S before it runs;
+- `startGraph(graphId)` — begin executing an already-persisted graph;
+- `onMessage(message)` — handle inbound messages (worker events + coordination).
+
+**`onMessage` resolving is the ack** — a rejection (or a crash) triggers redelivery, so
+handlers must be idempotent. See `packages/protocols/src/baseline.ts`.
