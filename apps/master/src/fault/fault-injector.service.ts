@@ -3,6 +3,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
 import { ProcessManagerService } from '../ipc-server/process-manager.service';
+import type { FaultAction } from '../metrics/metrics.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { StorageGate } from '../storage/storage-gate';
 import { SCENARIO, SCHEDULER } from '../tokens';
 import { NetworkState } from '../transport/delivery-sink';
@@ -28,6 +30,7 @@ export class FaultInjectorService {
     private readonly transport: TransportService,
     private readonly worker: WorkerPoolService,
     private readonly events: EventLogService,
+    private readonly metrics: MetricsService,
   ) {}
 
   /** Schedule all declared faults relative to now (call once, at run start). */
@@ -43,7 +46,7 @@ export class FaultInjectorService {
       killNode: (f) => this.killNode(f.node, f.restartAfterMs),
       storageOutage: (f) => this.storageOutage(f.scope, f.durationMs),
       partitionNode: (f) => this.partitionNode(f.node, f.durationMs, f.direction),
-      duplicateDeliveries: (f) => this.duplicateDeliveries(f.from, f.to, f.extraCopies),
+      duplicateDeliveries: (f) => this.duplicateDeliveries(f.extraCopies),
       failTask: (f) => this.failTask(f.taskId),
     };
     (dispatch[fault.action] as (f: FaultSpec) => void)(fault);
@@ -78,9 +81,9 @@ export class FaultInjectorService {
     });
   }
 
-  public duplicateDeliveries(from: NodeId, to: NodeId, extraCopies: number): void {
-    this.record('duplicateDeliveries', { from, to, extraCopies });
-    this.transport.scheduleDuplicates(from, to, extraCopies);
+  public duplicateDeliveries(extraCopies: number): void {
+    this.record('duplicateDeliveries', { extraCopies });
+    this.transport.scheduleDuplicates(extraCopies);
   }
 
   public failTask(taskId: TaskId): void {
@@ -88,8 +91,9 @@ export class FaultInjectorService {
     this.worker.failTask(taskId);
   }
 
-  private record(action: string, data: Record<string, unknown>): void {
+  private record(action: FaultAction, data: Record<string, unknown>): void {
     this.logger.log(`fault: ${action} ${JSON.stringify(data)}`);
     this.events.record({ type: 'fault.injected', data: { action, ...data } });
+    this.metrics.countFault(action);
   }
 }

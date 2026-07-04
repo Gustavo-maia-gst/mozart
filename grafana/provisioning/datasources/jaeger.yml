@@ -1,0 +1,34 @@
+apiVersion: 1
+
+datasources:
+  - name: Jaeger
+    type: jaeger
+    uid: mozart-jaeger
+    access: proxy
+    # Jaeger's own query UI/OTLP container. Grafana reaches it over the compose
+    # network; the browser never talks to it directly.
+    url: http://jaeger:16686
+    jsonData:
+      # --- Trace → Metrics -------------------------------------------------
+      # From a span, jump to the matching Prometheus series. We map the span's
+      # protocol/run_id tags onto the promoted metric labels so "open metrics
+      # for this trace" lands on the right run.
+      tracesToMetrics:
+        datasourceUid: mozart-prometheus
+        tags:
+          - { key: 'mozart.protocol', value: 'mozart_protocol' }
+          - { key: 'mozart.run_id', value: 'mozart_run_id' }
+        queries:
+          - name: 'Worker task duration p95 (this run)'
+            query: 'histogram_quantile(0.95, sum(mozart_worker_task_duration_milliseconds{$$__tags}))'
+          - name: 'Redelivery ratio (this run)'
+            query: 'sum(mozart_messages_total{type="redelivered",$$__tags}) / sum(mozart_messages_total{type="delivered",$$__tags})'
+      # --- Trace → Logs (wired for when Loki/JSONL lands; harmless until then)
+      tracesToLogsV2:
+        datasourceUid: mozart-prometheus
+        spanStartTimeShift: '-2m'
+        spanEndTimeShift: '2m'
+        filterByTraceID: true
+      # Show a node-graph tab (service/span topology) for a trace when present.
+      nodeGraph:
+        enabled: true

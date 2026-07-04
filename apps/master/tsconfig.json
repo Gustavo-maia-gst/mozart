@@ -10,6 +10,7 @@
     { "path": "../../packages/contracts" },
     { "path": "../../packages/ipc" },
     { "path": "../../packages/latency" },
+    { "path": "../../packages/protocols" },
     { "path": "../../packages/telemetry" }
   ]
 }

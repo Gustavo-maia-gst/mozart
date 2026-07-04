@@ -1,8 +1,8 @@
 import {
+  CONTROL_TOPICS,
   type Delivery,
-  type Graph,
+  type GraphId,
   type PushType,
-  type ScenarioInfo,
   type WorkerFailEvent,
   WORKER_TOPICS,
   type WorkerSuccessEvent,
@@ -36,9 +36,10 @@ interface BufferedPush {
 @Injectable()
 export class ProtocolHostService {
   private readonly logger = new Logger(ProtocolHostService.name);
-  private scenario?: ScenarioInfo;
   private ready = false;
   private readonly buffer: BufferedPush[] = [];
+  /** Serializes dispatch so pushes/deliveries run one at a time, in arrival order. */
+  private queue: Promise<void> = Promise.resolve();
 
   constructor(
     @Inject(IPC_CLIENT) private readonly ipc: IpcClient,
@@ -48,10 +49,9 @@ export class ProtocolHostService {
 
   public async start(): Promise<void> {
     // Register the push handler first; anything arriving before the handshake
-    // completes is buffered and drained once the scenario is known.
+    // completes is buffered and drained once we're ready.
     this.ipc.onPush((type, payload, frame) => this.onPush(type, payload, frame.traceCtx));
-    const { scenario } = await this.ipc.call('node.ready', {});
-    this.scenario = scenario;
+    await this.ipc.call('node.ready', {});
     this.ready = true;
     for (const p of this.buffer.splice(0)) this.onPush(p.type, p.payload, p.traceCtx);
   }
@@ -61,28 +61,23 @@ export class ProtocolHostService {
       this.buffer.push({ type, payload, traceCtx });
       return;
     }
-    // Dispatch under the pushed trace context (one tree across processes) and an
+    // Chain onto the queue so pushes dispatch one at a time, in arrival order,
+    // each under the pushed trace context (one tree across processes) and an
     // ambient scope carrying this node's id.
-    void runWithExtractedContext(traceCtx, () =>
-      runInTraceScope({ nodeId: this.nodeId }, () => this.dispatch(type, payload)),
-    );
+    this.queue = this.queue
+      .then(() =>
+        runWithExtractedContext(traceCtx, () =>
+          runInTraceScope({ nodeId: this.nodeId }, () => this.dispatch(type, payload)),
+        ),
+      )
+      .catch((err: unknown) => this.logger.error(`dispatch failed: ${String(err)}`));
   }
 
   private async dispatch(type: PushType, payload: unknown): Promise<void> {
-    if (type === 'protocol.activate') {
-      await this.runActivate();
-    } else if (type === 'protocol.deactivate') {
+    if (type === 'protocol.deactivate') {
       process.exit(0); // graceful shutdown; telemetry flush happens in main
     } else if (type === 'delivery') {
       await this.runDelivery(payload as Delivery);
-    }
-  }
-
-  /** Persist and start every graph in the run. */
-  private async runActivate(): Promise<void> {
-    for (const graph of this.scenario?.graphs ?? []) {
-      await this.persistGraph(graph);
-      await this.startGraph(graph);
     }
   }
 
@@ -100,13 +95,17 @@ export class ProtocolHostService {
   }
 
   /**
-   * Route a delivery by topic to exactly one protocol handler, narrowing the
-   * transport {@link Delivery} to a delivery-free domain event: worker topics
-   * become {@link WorkerSuccessEvent}/{@link WorkerFailEvent}, everything else
-   * is a coordinator<->coordinator {@link Message}. The host keeps the raw
-   * delivery for acking/tracing; the protocol never sees it.
+   * Route a delivery by topic to exactly one handler: the `graph.start` control
+   * message starts the graph; worker topics narrow to a delivery-free
+   * {@link WorkerSuccessEvent}/{@link WorkerFailEvent}; anything else is a
+   * coordinator<->coordinator {@link Message}. The host keeps the raw delivery
+   * for acking/tracing; the protocol never sees it.
    */
   private async route(delivery: Delivery, taskId: unknown): Promise<void> {
+    if (delivery.topic === CONTROL_TOPICS.graphStart) {
+      await this.startGraph(delivery, (delivery.body as { graphId: GraphId }).graphId);
+      return;
+    }
     const isWorkerEvent = delivery.topic === WORKER_TOPICS.completed || delivery.topic === WORKER_TOPICS.failed;
     if (!isWorkerEvent) {
       await this.onMessage(delivery);
@@ -121,16 +120,14 @@ export class ProtocolHostService {
     else await this.onWorkerFail(delivery, { taskId });
   }
 
-  @Trace({ name: (graph: Graph) => `protocol.persistGraph(${graph.id})` })
-  private async persistGraph(graph: Graph): Promise<void> {
-    annotateSpan({ 'mozart.graph_id': graph.id });
-    await this.protocol.persistGraph(graph);
-  }
-
-  @Trace({ name: (graph: Graph) => `protocol.startGraph(${graph.id})` })
-  private async startGraph(graph: Graph): Promise<void> {
-    annotateSpan({ 'mozart.graph_id': graph.id });
-    await this.protocol.startGraph(graph.id);
+  // Nests under the graph's lifetime span on the master (opened on graph.start,
+  // closed on completeGraph) via the push context, alongside its storage.read /
+  // worker.start children.
+  @Trace({ name: (_d, id: GraphId) => `protocol.startGraph(${id})`, kind: SpanKind.CONSUMER })
+  private async startGraph(delivery: Delivery, id: GraphId): Promise<void> {
+    this.annotate(delivery);
+    annotateSpan({ [ATTR.graphId]: id });
+    await this.protocol.startGraph(id);
   }
 
   @Trace({

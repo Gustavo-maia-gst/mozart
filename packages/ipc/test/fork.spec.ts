@@ -11,14 +11,15 @@ const fixture = join(__dirname, 'fixture-slave.cjs');
 function makeHandlers(overrides: Partial<RpcHandlers>): RpcHandlers {
   const methods: RpcMethod[] = [
     'node.ready',
-    'transport.publish',
+    'transport.toCoordinators',
+    'transport.toWorkerPool',
     'transport.ack',
+    'transport.completeGraph',
     'storage.read',
     'storage.readExclusive',
     'storage.save',
     'storage.lease.save',
     'storage.lease.release',
-    'worker.start',
   ];
   const base = {} as Record<RpcMethod, () => Promise<unknown>>;
   for (const m of methods) base[m] = () => Promise.reject(new Error(`unexpected ${m}`));
@@ -44,7 +45,7 @@ describe.runIf(distReady)('IPC over a real fork', () => {
       childFrameChannel(child),
       makeHandlers({
         'node.ready': () => Promise.resolve({ scenario: { nodeId: 'n1' } as never }),
-        'worker.start': (_n, p) => {
+        'transport.toWorkerPool': (_n, p) => {
           resolveReady(p.taskId);
           return Promise.resolve({});
         },
@@ -65,7 +66,6 @@ describe.runIf(distReady)('IPC over a real fork', () => {
     link.push('delivery', {
       deliveryId: 'd1',
       messageId: 'm1',
-      from: 'n2',
       topic: 'ping',
       body: {},
       attempt: 1,

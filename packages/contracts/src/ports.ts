@@ -1,4 +1,5 @@
-import type { NodeId, TaskId } from './ids';
+import type { GraphId } from './graph';
+import type { TaskId } from './ids';
 import type { Json, JsonObject } from './json';
 
 /** State persisted for a task in the shared storage S. */
@@ -25,7 +26,6 @@ export type StorageQuery = JsonObject;
 export interface Delivery {
   deliveryId: string;
   messageId: string;
-  from: NodeId;
   topic: string;
   body: Json;
   /** 1 on first delivery; incremented on every redelivery/duplicate. */
@@ -35,15 +35,26 @@ export interface Delivery {
 }
 
 /**
- * Async at-least-once messaging, FIFO per (from, to) logical channel,
- * ack-based redelivery. Consumption is push-based: the harness invokes
- * `Protocol.onMessage`; the ack is issued when the handler resolves.
+ * The two message buses a coordinator talks over. There is no point-to-point
+ * addressing: a coordinator only ever talks to *the coordinators* (one logical
+ * entity, backed by N interchangeable processes) or to *the worker pool*.
+ * Delivery is at-least-once with no ordering and no de-duplication guarantee —
+ * the same message may arrive more than once, so handlers must be idempotent.
  *
  * Abstract class (not interface) so it doubles as a Nest DI token: protocols
  * inject it by type via the constructor, no `@Inject` needed.
  */
 export abstract class TransportPort {
-  public abstract publish(to: NodeId, topic: string, body: Json): Promise<void>;
+  /** Send a message to the coordinators (delivered to one of them). */
+  public abstract sendToCoordinators(topic: string, body: Json): Promise<void>;
+  /** Dispatch a task to the worker pool W for execution. */
+  public abstract sendToWorkerPool(taskId: TaskId): Promise<void>;
+  /**
+   * Special coordinator→master signal: the graph finished coordinating. Closes
+   * its lifetime span and lets the harness detect end-of-processing. Not a
+   * coordinator-to-coordinator message — a direct word to the harness.
+   */
+  public abstract completeGraph(graphId: GraphId): Promise<void>;
 }
 
 /**
@@ -75,19 +86,16 @@ export interface ExclusiveRead {
   release(): Promise<void>;
 }
 
-/**
- * Worker Pool W. `start` is fire-and-forget: completion or failure is
- * notified later as a transport delivery from node `W` (topics
- * `task.completed` / `task.failed`), subject to at-least-once semantics.
- */
-export abstract class WorkerPoolPort {
-  public abstract start(taskId: TaskId): Promise<void>;
-}
-
 /** Topics used by the Worker Pool W when notifying coordinators. */
 export const WORKER_TOPICS = {
   completed: 'task.completed',
   failed: 'task.failed',
+} as const;
+
+/** Topics used by the harness to drive coordinators (not protocol messages). */
+export const CONTROL_TOPICS = {
+  /** Start an already-persisted graph; body is `{ graphId }`. */
+  graphStart: 'graph.start',
 } as const;
 
 export interface WorkerEventBody extends JsonObject {
@@ -117,7 +125,6 @@ export interface WorkerFailEvent {
 
 /** A coordinator<->coordinator message. */
 export interface Message {
-  readonly from: NodeId;
   readonly topic: string;
   readonly body: Json;
 }

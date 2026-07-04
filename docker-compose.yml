@@ -3,9 +3,10 @@ services:
     image: jaegertracing/jaeger:2.9.0
     container_name: mozart-jaeger
     ports:
-      - '16686:16686' # UI
-      - '4318:4318' # OTLP http
-      - '4317:4317' # OTLP grpc
+      - '2016:16686' # UI
+      - '2018:4318' # OTLP http
+      - '2017:4317' # OTLP grpc
+
   postgres:
     image: postgres:17-alpine
     container_name: mozart-postgres
@@ -19,3 +20,37 @@ services:
       test: ['CMD-SHELL', 'pg_isready -U mozart']
       interval: 2s
       retries: 15
+
+  # Metrics backend: ingests OTLP metrics pushed by the master over HTTP
+  # (:2090/api/v1/otlp/v1/metrics) and serves them to Grafana. Native histograms
+  # enabled so OTel exponential histograms land intact for histogram_quantile.
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: mozart-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-otlp-receiver'
+      - '--enable-feature=native-histograms'
+    ports:
+      - '2090:9090'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  # Dashboards. Datasource + dashboards provisioned from disk (dashboards as code).
+  # Anonymous admin for a zero-login local research tool. Reaches prometheus over
+  # the compose network (http://prometheus:9090); users open http://localhost:2000.
+  grafana:
+    image: grafana/grafana:11.6.0
+    container_name: mozart-grafana
+    depends_on:
+      - prometheus
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: 'Admin'
+      GF_AUTH_DISABLE_LOGIN_FORM: 'true'
+      GF_SERVER_ROOT_URL: 'http://localhost:2000'
+    ports:
+      - '2000:3000'
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro

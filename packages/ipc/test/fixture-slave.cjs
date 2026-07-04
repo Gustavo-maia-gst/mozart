@@ -17,5 +17,5 @@ client.onPush(async (type, payload) => {
   const { scenario } = await client.call('node.ready', {});
   // Echo our identity back through a distinct RPC so the parent can assert the
   // full round trip happened over a real fork.
-  await client.call('worker.start', { taskId: `ready:${scenario.nodeId}` });
+  await client.call('transport.toWorkerPool', { taskId: `ready:${scenario.nodeId}` });
 })().catch(() => {});

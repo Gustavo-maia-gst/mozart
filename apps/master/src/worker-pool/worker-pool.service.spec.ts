@@ -1,8 +1,9 @@
-import { type Json, type NodeId, Scenario, type ScenarioData, WORKER_NODE_ID, WORKER_TOPICS } from '@mozart/contracts';
+import { type Json, Scenario, type ScenarioData, WORKER_NODE_ID, WORKER_TOPICS } from '@mozart/contracts';
 import { LatencyModel } from '@mozart/latency';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { CancelHandle, Clock, Scheduler } from '../clock/clock';
 import type { EventInput, EventLogService } from '../event-log/event-log.service';
+import { MetricsService } from '../metrics/metrics.service';
 import type { TransportService } from '../transport/transport.service';
 import { WorkerPoolService } from './worker-pool.service';
 
@@ -34,9 +35,9 @@ class VirtualTime implements Clock, Scheduler {
 }
 
 class FakeTransport {
-  readonly published: { from: NodeId; to: NodeId; topic: string; body: Json }[] = [];
-  public publish(from: NodeId, to: NodeId, topic: string, body: Json): string {
-    this.published.push({ from, to, topic, body });
+  readonly published: { topic: string; body: Json; origin: string }[] = [];
+  public sendToCoordinators(topic: string, body: Json, origin: string): string {
+    this.published.push({ topic, body, origin });
     return 'm';
   }
 }
@@ -59,6 +60,7 @@ const scenario = new Scenario({
       tasks: [
         { id: 't1', dependsOn: [], costMs: 100 },
         { id: 't2', dependsOn: [] },
+        { id: 't3', dependsOn: ['t1'], costMs: 100 },
       ],
     },
   ],
@@ -74,9 +76,11 @@ function build() {
   const worker = new WorkerPoolService(
     time,
     latency,
+    time,
     scenario,
     transport as unknown as TransportService,
     log as unknown as EventLogService,
+    new MetricsService(),
   );
   return { time, transport, log, worker };
 }
@@ -87,19 +91,19 @@ describe('WorkerPoolService', () => {
     ctx = build();
   });
 
-  it('publishes task.completed to the starting node after the task duration', () => {
+  it('publishes task.completed to the coordinators after the task duration', () => {
     const { worker, time, transport } = ctx;
-    worker.start('n1', 'g0-t1');
+    worker.start('g0-t1');
     expect(transport.published).toHaveLength(0);
     time.advance(100); // g0-t1 costMs
     expect(transport.published).toEqual([
-      { from: WORKER_NODE_ID, to: 'n1', topic: WORKER_TOPICS.completed, body: { taskId: 'g0-t1' } },
+      { topic: WORKER_TOPICS.completed, body: { taskId: 'g0-t1' }, origin: WORKER_NODE_ID },
     ]);
   });
 
   it('uses the sampled duration when the task has no costMs', () => {
     const { worker, time, transport } = ctx;
-    worker.start('n1', 'g0-t2'); // no costMs => latency 50
+    worker.start('g0-t2'); // no costMs => latency 50
     time.advance(49);
     expect(transport.published).toHaveLength(0);
     time.advance(1);
@@ -108,8 +112,8 @@ describe('WorkerPoolService', () => {
 
   it('ignores a duplicate start while the task is running', () => {
     const { worker, time, transport, log } = ctx;
-    worker.start('n1', 'g0-t1');
-    worker.start('n1', 'g0-t1');
+    worker.start('g0-t1');
+    worker.start('g0-t1');
     expect(log.ofType('worker.duplicate-start')).toHaveLength(1);
     time.advance(100);
     expect(transport.published).toHaveLength(1); // only one completion
@@ -117,21 +121,46 @@ describe('WorkerPoolService', () => {
 
   it('allows restart after completion', () => {
     const { worker, time, transport } = ctx;
-    worker.start('n1', 'g0-t1');
+    worker.start('g0-t1');
     time.advance(100);
-    worker.start('n1', 'g0-t1');
+    worker.start('g0-t1');
     time.advance(100);
     expect(transport.published).toHaveLength(2);
+  });
+
+  it('records worker.premature-start when a task starts before its deps completed', () => {
+    const { worker, log } = ctx;
+    worker.start('g0-t3'); // depends on g0-t1, which never completed
+    const violations = log.ofType('worker.premature-start');
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.data).toEqual({ missingDeps: ['g0-t1'] });
+  });
+
+  it('does not flag a task started after its deps completed', () => {
+    const { worker, time, log } = ctx;
+    worker.start('g0-t1');
+    time.advance(100); // g0-t1 completes successfully
+    worker.start('g0-t3');
+    expect(log.ofType('worker.premature-start')).toHaveLength(0);
+  });
+
+  it('still flags premature start when the dep only failed (never completed)', () => {
+    const { worker, time, log } = ctx;
+    worker.failTask('g0-t1');
+    worker.start('g0-t1');
+    time.advance(100); // g0-t1 fails => not a satisfied dep
+    worker.start('g0-t3');
+    expect(log.ofType('worker.premature-start')).toHaveLength(1);
   });
 
   it('emits task.failed (one-shot) when the task is marked to fail', () => {
     const { worker, time, transport } = ctx;
     worker.failTask('g0-t1');
-    worker.start('n1', 'g0-t1');
+    worker.start('g0-t1');
     time.advance(100);
     expect(transport.published[0]?.topic).toBe(WORKER_TOPICS.failed);
 
-    worker.start('n1', 'g0-t1'); // fail flag was one-shot
+    worker.start('g0-t1'); // fail flag was one-shot
     time.advance(100);
     expect(transport.published[1]?.topic).toBe(WORKER_TOPICS.completed);
   });

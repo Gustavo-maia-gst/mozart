@@ -8,9 +8,11 @@
     "build": "tsc -b"
   },
   "dependencies": {
+    "graphology": "^0.26.0",
     "zod": "^4.4.0"
   },
   "devDependencies": {
+    "graphology-types": "^0.24.8",
     "yaml": "^2.9.0"
   }
 }

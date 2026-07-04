@@ -1,0 +1,19 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: mozart-prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      # Prometheus native histograms (OTel exponential) — enable histogram_quantile.
+      prometheusType: Prometheus
+      prometheusVersion: 3.5.0
+      # Exemplars: histogram points carry a trace_id; click one to open the trace
+      # in Jaeger. Depends on the master attaching exemplars at record() time.
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: mozart-jaeger
+          urlDisplayLabel: 'View trace'

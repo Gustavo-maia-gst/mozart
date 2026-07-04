@@ -1,0 +1,187 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "title": "Mozart — Run drill-down",
+  "uid": "mozart-run-drilldown",
+  "tags": ["mozart"],
+  "schemaVersion": 39,
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      { "name": "datasource", "type": "datasource", "query": "prometheus", "current": {}, "hide": 0 },
+      {
+        "name": "run",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": { "query": "label_values(mozart_messages_total, mozart_run_id)", "refId": "r" },
+        "refresh": 2,
+        "sort": 5,
+        "includeAll": false,
+        "multi": false,
+        "current": {},
+        "label": "Run"
+      },
+      {
+        "name": "service",
+        "type": "textbox",
+        "current": { "text": "", "value": "" },
+        "label": "Jaeger service (coordinator)",
+        "description": "Service name used for the traces panel (the coordinator name from the scenario YAML, or 'mozart-master')."
+      }
+    ]
+  },
+  "panels": [
+    { "type": "row", "title": "Overview", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
+    {
+      "type": "stat",
+      "title": "Makespan (ms)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "options": { "colorMode": "value", "graphMode": "none" },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "histogram_sum(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}) / histogram_count(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"})"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Tasks completed",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "colorMode": "value", "graphMode": "none" },
+      "targets": [
+        { "refId": "A", "instant": true, "expr": "sum(mozart_worker_tasks_total{outcome=\"completed\", mozart_run_id=\"$run\"})" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Tasks failed",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } } },
+      "options": { "colorMode": "value", "graphMode": "none" },
+      "targets": [
+        { "refId": "A", "instant": true, "expr": "sum(mozart_worker_tasks_total{outcome=\"failed\", mozart_run_id=\"$run\"})" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Redelivery ratio",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "options": { "colorMode": "value", "graphMode": "none" },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum(mozart_messages_total{type=\"redelivered\", mozart_run_id=\"$run\"}) / sum(mozart_messages_total{type=\"delivered\", mozart_run_id=\"$run\"})"
+        }
+      ]
+    },
+    { "type": "row", "title": "Throughput over time", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 } },
+    {
+      "type": "timeseries",
+      "title": "Task outcome rate (/s)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 15, "stacking": { "mode": "normal" } } } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate(mozart_worker_tasks_total{mozart_run_id=\"$run\"}[$__rate_interval]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Message rate by type (/s)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 15 } } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (type) (rate(mozart_messages_total{mozart_run_id=\"$run\"}[$__rate_interval]))",
+          "legendFormat": "{{type}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Storage op rate by op (/s)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 15 } } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (op) (rate(mozart_storage_ops_total{mozart_run_id=\"$run\"}[$__rate_interval]))",
+          "legendFormat": "{{op}}"
+        }
+      ]
+    },
+    { "type": "row", "title": "Concurrency (live gauges)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 } },
+    {
+      "type": "timeseries",
+      "title": "In-flight messages (delivered, unacked)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 20 } } },
+      "targets": [
+        { "refId": "A", "expr": "sum(mozart_transport_inflight{mozart_run_id=\"$run\"})", "legendFormat": "in-flight" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Exclusive-lock leases held",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 20 } } },
+      "targets": [
+        { "refId": "A", "expr": "sum(mozart_storage_leases_held{mozart_run_id=\"$run\"})", "legendFormat": "leases held" }
+      ]
+    },
+    { "type": "row", "title": "Latency percentiles over time", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 } },
+    {
+      "type": "timeseries",
+      "title": "Worker task duration p50/p90/p99 (ms)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        { "refId": "p50", "expr": "histogram_quantile(0.5, sum(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}))", "legendFormat": "p50" },
+        { "refId": "p90", "expr": "histogram_quantile(0.9, sum(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}))", "legendFormat": "p90" },
+        { "refId": "p99", "expr": "histogram_quantile(0.99, sum(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Ack round-trip & lock wait p95 (ms)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        { "refId": "ack", "expr": "histogram_quantile(0.95, sum(mozart_transport_ack_latency_milliseconds{mozart_run_id=\"$run\"}))", "legendFormat": "ack p95" },
+        { "refId": "lock", "expr": "histogram_quantile(0.95, sum(mozart_storage_lock_wait_milliseconds{mozart_run_id=\"$run\"}))", "legendFormat": "lock wait p95" }
+      ]
+    },
+    { "type": "row", "title": "Traces (Jaeger)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 } },
+    {
+      "type": "traces",
+      "title": "Recent traces — set the $service variable (coordinator name)",
+      "datasource": { "type": "jaeger", "uid": "mozart-jaeger" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 42 },
+      "targets": [
+        { "refId": "A", "queryType": "search", "service": "$service", "limit": 20 }
+      ]
+    }
+  ]
+}

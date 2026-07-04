@@ -1,7 +1,8 @@
 import { LatencyModel } from '@mozart/latency';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { TimerScheduler } from '../clock/clock';
+import { SystemClock, TimerScheduler } from '../clock/clock';
 import type { EventInput, EventLogService } from '../event-log/event-log.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { InMemoryStorageAdapter } from './in-memory.adapter';
 import { StorageService } from './storage.service';
 import { NodeCrashedError } from './storage-adapter';
@@ -35,8 +36,10 @@ function build() {
     new InMemoryStorageAdapter(),
     new LatencyModel('s', {}), // all latencies 0
     new TimerScheduler(),
+    new SystemClock(),
     gate,
     log as unknown as EventLogService,
+    new MetricsService(),
   );
   return { gate, log, service };
 }

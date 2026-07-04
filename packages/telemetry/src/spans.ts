@@ -5,10 +5,13 @@ import { TRACER_NAME } from './telemetry';
 /** Mozart span/attribute keys (mixed with standard messaging.* where they exist). */
 export const ATTR = {
   nodeId: 'mozart.node_id',
+  /** Logical origin of a message (telemetry only; never part of the payload). */
+  from: 'mozart.from',
   runId: 'mozart.run_id',
   protocol: 'mozart.protocol',
   channel: 'mozart.channel',
   taskId: 'mozart.task_id',
+  graphId: 'mozart.graph_id',
   messageId: 'messaging.message_id',
   deliveryId: 'mozart.delivery_id',
   attempt: 'mozart.attempt',

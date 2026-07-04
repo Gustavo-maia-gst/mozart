@@ -31,8 +31,10 @@ export const EVENT_TYPES = [
   'storage.outage.end',
   'worker.started',
   'worker.duplicate-start',
+  'worker.premature-start',
   'worker.completed',
   'worker.failed',
+  'graph.completed',
   'fault.injected',
 ] as const;
 

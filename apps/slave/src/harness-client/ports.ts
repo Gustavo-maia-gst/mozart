@@ -1,14 +1,13 @@
 import type {
   ExclusiveRead,
+  GraphId,
   Json,
-  NodeId,
   StoragePort,
   StorageQuery,
   TaskId,
   TaskMatch,
   TaskState,
   TransportPort,
-  WorkerPoolPort,
 } from '@mozart/contracts';
 import type { IpcClient } from '@mozart/ipc';
 import { annotateSpan, ATTR, SpanKind, Trace } from '@mozart/telemetry';
@@ -25,20 +24,20 @@ import { IPC_CLIENT } from '../tokens';
 export class TransportClient implements TransportPort {
   constructor(@Inject(IPC_CLIENT) private readonly ipc: IpcClient) {}
 
-  @Trace({ name: (_to, topic) => `transport.publish(${topic})`, kind: SpanKind.PRODUCER })
-  public async publish(to: NodeId, topic: string, body: Json): Promise<void> {
+  @Trace({ name: (topic) => `transport.sendToCoordinators(${topic})`, kind: SpanKind.PRODUCER })
+  public async sendToCoordinators(topic: string, body: Json): Promise<void> {
     annotateSpan({ [ATTR.topic]: topic });
-    await this.ipc.call('transport.publish', { to, topic, body });
+    await this.ipc.call('transport.toCoordinators', { topic, body });
   }
-}
 
-@Injectable()
-export class WorkerPoolClient implements WorkerPoolPort {
-  constructor(@Inject(IPC_CLIENT) private readonly ipc: IpcClient) {}
+  @Trace({ name: (taskId) => `transport.sendToWorkerPool(${taskId})`, kind: SpanKind.PRODUCER })
+  public async sendToWorkerPool(taskId: TaskId): Promise<void> {
+    await this.ipc.call('transport.toWorkerPool', { taskId });
+  }
 
-  @Trace({ name: (taskId) => `worker.start(${taskId})`, kind: SpanKind.CLIENT })
-  public async start(taskId: TaskId): Promise<void> {
-    await this.ipc.call('worker.start', { taskId });
+  @Trace({ name: (graphId) => `transport.completeGraph(${graphId})`, kind: SpanKind.CLIENT })
+  public async completeGraph(graphId: GraphId): Promise<void> {
+    await this.ipc.call('transport.completeGraph', { graphId });
   }
 }
 

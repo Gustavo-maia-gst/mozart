@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { NodeId, StorageQuery, TaskId, TaskMatch, TaskState } from '@mozart/contracts';
 import type { LatencyModel } from '@mozart/latency';
 import { Inject, Injectable } from '@nestjs/common';
-import type { Scheduler } from '../clock/clock';
+import type { Clock, Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
-import { LATENCY_MODEL, SCHEDULER } from '../tokens';
+import { MetricsService } from '../metrics/metrics.service';
+import { CLOCK, LATENCY_MODEL, SCHEDULER } from '../tokens';
 import { type AdapterLease, NodeCrashedError, STORAGE_ADAPTER, type StorageAdapter } from './storage-adapter';
 import { StorageGate } from './storage-gate';
 
@@ -29,53 +30,72 @@ export class StorageService {
   private readonly leases = new Map<string, HeldLease>();
   private readonly pendingByNode = new Map<NodeId, Set<AbortController>>();
 
+  // biome-ignore lint/complexity/useMaxParams: deps injection
   constructor(
     @Inject(STORAGE_ADAPTER) private readonly adapter: StorageAdapter,
     @Inject(LATENCY_MODEL) private readonly latency: LatencyModel,
     @Inject(SCHEDULER) private readonly scheduler: Scheduler,
+    @Inject(CLOCK) private readonly clock: Clock,
     private readonly gate: StorageGate,
     private readonly events: EventLogService,
+    private readonly metrics: MetricsService,
   ) {}
 
   public async read(nodeId: NodeId, taskId: TaskId): Promise<TaskState | null> {
     await this.gate.pass(nodeId);
-    await this.sleep(this.latency.sample('storage.read'));
+    const ms = this.latency.sample('storage.read');
+    this.metrics.observeStorageOpDuration('read', ms);
+    await this.sleep(ms);
     const data = await this.adapter.read(taskId);
     this.events.record({ type: 'storage.read', nodeId, taskId });
+    this.metrics.countStorageOp('read');
     return data;
   }
 
   public async find(nodeId: NodeId, query: StorageQuery): Promise<TaskMatch[]> {
     await this.gate.pass(nodeId);
-    await this.sleep(this.latency.sample('storage.find'));
+    const ms = this.latency.sample('storage.find');
+    this.metrics.observeStorageOpDuration('find', ms);
+    await this.sleep(ms);
     const matches = await this.adapter.find(query);
     this.events.record({ type: 'storage.find', nodeId, data: { query, count: matches.length } });
+    this.metrics.countStorageOp('find');
     return matches;
   }
 
   public async save(nodeId: NodeId, taskId: TaskId, data: TaskState): Promise<void> {
     await this.gate.pass(nodeId);
-    await this.sleep(this.latency.sample('storage.save'));
+    const ms = this.latency.sample('storage.save');
+    this.metrics.observeStorageOpDuration('save', ms);
+    await this.sleep(ms);
     await this.adapter.save(taskId, data);
     this.events.record({ type: 'storage.save', nodeId, taskId });
+    this.metrics.countStorageOp('save');
   }
 
   public async readExclusive(nodeId: NodeId, taskId: TaskId): Promise<ExclusiveReadResult> {
     await this.gate.pass(nodeId);
     this.events.record({ type: 'storage.readExclusive.requested', nodeId, taskId });
-    await this.sleep(this.latency.sample('storage.readExclusive'));
+    const ms = this.latency.sample('storage.readExclusive');
+    this.metrics.observeStorageOpDuration('readExclusive', ms);
+    this.metrics.countStorageOp('readExclusive');
+    await this.sleep(ms);
 
     const controller = new AbortController();
     this.addPending(nodeId, controller);
     let lease: AdapterLease;
+    const acquireStart = this.clock.now();
     try {
       lease = await this.adapter.acquire(taskId, controller.signal);
     } finally {
       this.removePending(nodeId, controller);
     }
+    // Real lock-contention wait (adapter mutex / row lock), not injected latency.
+    this.metrics.observeLockWait(this.clock.now() - acquireStart);
 
     const leaseId = randomUUID();
     this.leases.set(leaseId, { nodeId, taskId, lease });
+    this.metrics.leaseAcquired();
     this.events.record({
       type: 'storage.readExclusive.acquired',
       nodeId,
@@ -89,9 +109,13 @@ export class StorageService {
     const held = this.leases.get(leaseId);
     if (!held) return; // stale (e.g. force-released after a crash) — idempotent
     this.leases.delete(leaseId);
-    await this.sleep(this.latency.sample('storage.save'));
+    const ms = this.latency.sample('storage.save');
+    this.metrics.observeStorageOpDuration('save', ms);
+    await this.sleep(ms);
     await held.lease.save(data);
+    this.metrics.leaseReleased();
     this.events.record({ type: 'storage.save', nodeId: held.nodeId, taskId: held.taskId });
+    this.metrics.countStorageOp('save');
     this.events.record({
       type: 'storage.lease.released',
       nodeId: held.nodeId,
@@ -105,6 +129,7 @@ export class StorageService {
     if (!held) return;
     this.leases.delete(leaseId);
     await held.lease.release();
+    this.metrics.leaseReleased();
     this.events.record({
       type: 'storage.lease.released',
       nodeId: held.nodeId,
@@ -127,6 +152,7 @@ export class StorageService {
       if (held.nodeId !== nodeId) continue;
       this.leases.delete(leaseId);
       await held.lease.release().catch(() => {});
+      this.metrics.leaseReleased();
       this.events.record({
         type: 'storage.lease.force-released',
         nodeId,

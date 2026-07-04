@@ -1,0 +1,154 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "title": "Mozart — Resilience & faults",
+  "uid": "mozart-resilience",
+  "tags": ["mozart"],
+  "schemaVersion": 39,
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      { "name": "datasource", "type": "datasource", "query": "prometheus", "current": {}, "hide": 0 },
+      {
+        "name": "protocol",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": { "query": "label_values(mozart_faults_total, mozart_protocol)", "refId": "p" },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "label": "Protocol"
+      }
+    ]
+  },
+  "panels": [
+    { "type": "row", "title": "Fault injection", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
+    {
+      "type": "bargauge",
+      "title": "Faults injected by action",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (action, mozart_protocol) (mozart_faults_total{mozart_protocol=~\"$protocol\"})",
+          "legendFormat": "{{mozart_protocol}} / {{action}}"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Node lifecycle events",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (event) (mozart_node_lifecycle_total{mozart_protocol=~\"$protocol\"})",
+          "legendFormat": "{{event}}"
+        }
+      ]
+    },
+    { "type": "row", "title": "Cost of recovery", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 } },
+    {
+      "type": "stat",
+      "title": "Restarts per killed node",
+      "description": "restarted / killed. ~1 = every crash re-spawns cleanly; <1 = crashes not recovered.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 10 },
+      "options": { "colorMode": "value", "graphMode": "none", "orientation": "horizontal" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (mozart_protocol) (mozart_node_lifecycle_total{event=\"restarted\", mozart_protocol=~\"$protocol\"}) / sum by (mozart_protocol) (mozart_node_lifecycle_total{event=\"killed\", mozart_protocol=~\"$protocol\"})",
+          "legendFormat": "{{mozart_protocol}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Redeliveries per fault",
+      "description": "redelivered messages / total faults — how much re-work a fault costs the protocol.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 10 },
+      "options": { "colorMode": "value", "graphMode": "none", "orientation": "horizontal" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (mozart_protocol) (mozart_messages_total{type=\"redelivered\", mozart_protocol=~\"$protocol\"}) / sum by (mozart_protocol) (mozart_faults_total{mozart_protocol=~\"$protocol\"})",
+          "legendFormat": "{{mozart_protocol}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Blocked messages",
+      "description": "Messages blocked (e.g. during storage outage / partition).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 10 },
+      "options": { "colorMode": "value", "graphMode": "none", "orientation": "horizontal" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (mozart_protocol) (mozart_messages_total{type=\"blocked\", mozart_protocol=~\"$protocol\"})",
+          "legendFormat": "{{mozart_protocol}}"
+        }
+      ]
+    },
+    { "type": "row", "title": "System under fault (over time)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 } },
+    {
+      "type": "timeseries",
+      "title": "Fault injection rate (/s)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "bars", "fillOpacity": 60 } } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (action) (rate(mozart_faults_total{mozart_protocol=~\"$protocol\"}[$__rate_interval]))",
+          "legendFormat": "{{action}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "In-flight messages & leases held",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 15 } } },
+      "targets": [
+        { "refId": "A", "expr": "sum(mozart_transport_inflight{mozart_protocol=~\"$protocol\"})", "legendFormat": "in-flight" },
+        { "refId": "B", "expr": "sum(mozart_storage_leases_held{mozart_protocol=~\"$protocol\"})", "legendFormat": "leases held" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Redelivery rate (/s)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 25 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 20 } } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (mozart_protocol) (rate(mozart_messages_total{type=\"redelivered\", mozart_protocol=~\"$protocol\"}[$__rate_interval]))",
+          "legendFormat": "{{mozart_protocol}}"
+        }
+      ]
+    }
+  ]
+}

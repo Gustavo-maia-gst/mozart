@@ -69,9 +69,11 @@ describe('Scenario', () => {
 
   it('namespaces task ids and dependsOn as <graphId>-<taskId>', () => {
     const scenario = new Scenario(data);
-    expect(scenario.graphs.map((g) => g.tasks.map((t) => t.id))).toEqual([['g0-a', 'g0-b'], ['g1-a']]);
-    // Same local id `a` in two graphs stays distinct once namespaced.
-    expect(scenario.graphs[0]?.tasks[1]?.dependsOn).toEqual(['g0-a']);
+    expect(scenario.graphs.map((g) => g.nodes())).toEqual([['g0-a', 'g0-b'], ['g1-a']]);
+    // Same local id `a` in two graphs stays distinct once namespaced. Edges run
+    // dep -> dependent, so `g0-b`'s dependency is its in-neighbour `g0-a`.
+    expect(scenario.graphs[0]?.inNeighbors('g0-b')).toEqual(['g0-a']);
+    expect(scenario.graphs.map((g) => g.getAttribute('id'))).toEqual(['g0', 'g1']);
   });
 
   it('exposes coordinator ids and names', () => {

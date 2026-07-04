@@ -1,26 +1,22 @@
 import {
-  type Graph,
+  buildGraph,
   ProtocolLogger,
   StoragePort,
   type TaskState,
   TransportPort,
   type WorkerSuccessEvent,
-  WorkerPoolPort,
 } from '@mozart/contracts';
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { BaselineProtocol } from './baseline';
 
 // Diamond DAG: a -> {b, c} -> d.
-const graph: Graph = {
-  id: 'g0',
-  tasks: [
-    { id: 'a', dependsOn: [] },
-    { id: 'b', dependsOn: ['a'] },
-    { id: 'c', dependsOn: ['a'] },
-    { id: 'd', dependsOn: ['b', 'c'] },
-  ],
-};
+const graph = buildGraph('g0', [
+  { id: 'a' },
+  { id: 'b', dependsOn: ['a'] },
+  { id: 'c', dependsOn: ['a'] },
+  { id: 'd', dependsOn: ['b', 'c'] },
+]);
 
 const store = new Map<string, TaskState>();
 const started: string[] = [];
@@ -34,12 +30,15 @@ const storage: StoragePort = {
   },
   readExclusive: () => Promise.reject(new Error('baseline does not lock')),
 };
-const transport: TransportPort = { publish: () => Promise.resolve() };
-const workers: WorkerPoolPort = {
-  start: (t) => {
+// The baseline dispatches tasks via the transport's sendToWorkerPool; record
+// the task ids it hands off so the tests can assert the DAG ordering.
+const transport: TransportPort = {
+  sendToWorkerPool: (t) => {
     started.push(t);
     return Promise.resolve();
   },
+  sendToCoordinators: () => Promise.resolve(),
+  completeGraph: () => Promise.resolve(),
 };
 
 async function makeProtocol(): Promise<BaselineProtocol> {
@@ -48,7 +47,6 @@ async function makeProtocol(): Promise<BaselineProtocol> {
       BaselineProtocol,
       { provide: StoragePort, useValue: storage },
       { provide: TransportPort, useValue: transport },
-      { provide: WorkerPoolPort, useValue: workers },
       { provide: ProtocolLogger, useValue: { debug() {}, info() {}, warn() {}, error() {} } },
     ],
   }).compile();
@@ -69,7 +67,7 @@ describe('BaselineProtocol', () => {
     const p = await makeProtocol();
     // If property injection failed, persistGraph would throw on `this.storage`.
     await expect(p.persistGraph(graph)).resolves.toBeUndefined();
-    expect(store.get('graph:g0')).toEqual({ graph });
+    expect(store.get('graph:g0')).toEqual({ graph: graph.export() });
   });
 
   it('persists then starts only the roots', async () => {

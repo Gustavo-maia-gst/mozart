@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Graph } from './graph';
+import { buildGraph, type Graph, type GraphId, type GraphJson, serializeGraph } from './graph';
 
 /** Action types the latency model knows about out of the box. */
 export const KNOWN_LATENCY_ACTIONS = [
@@ -47,6 +47,8 @@ export const graphTaskSchema = z.object({
 export const graphSchema = z.object({
   id: graphIdSchema,
   tasks: z.array(graphTaskSchema).min(1),
+  /** Delay (ms) from run activation before this graph is started. 0 = at once. */
+  startAfterMs: z.number().min(0).default(0),
 });
 
 export const faultSchema = z.discriminatedUnion('action', [
@@ -73,8 +75,7 @@ export const faultSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('duplicateDeliveries'),
     at: z.number().min(0),
-    from: nodeIdSchema,
-    to: nodeIdSchema,
+    /** Extra copies emitted on the next delivery on the coordinators queue. */
     extraCopies: z.number().int().positive().default(1),
   }),
   z.object({
@@ -121,8 +122,12 @@ export interface ScenarioInfo {
   protocol: string;
   /** All coordinator node ids (excluding `W`). */
   nodes: string[];
-  /** The concurrent DAGs to coordinate, with runtime (namespaced) task ids. */
-  graphs: Graph[];
+  /**
+   * The concurrent DAGs to coordinate, with runtime (namespaced) task ids, in
+   * their JSON form — a live {@link Graph} does not survive the IPC channel, so
+   * slaves rehydrate each with `parseGraph`.
+   */
+  graphs: GraphJson[];
 }
 
 /**
@@ -137,17 +142,23 @@ export class Scenario {
 
   constructor(private readonly data: ScenarioData) {}
 
-  /** Runtime graphs: task ids (and `dependsOn`) namespaced as `<graphId>-<taskId>`. */
+  /**
+   * Runtime graphs, as directed graphs (edge `dep -> task`), with task ids
+   * namespaced `<graphId>-<taskId>` so they stay globally unique across the
+   * concurrent DAGs a run executes.
+   */
   get graphs(): Graph[] {
     if (!this.cachedGraphs) {
-      this.cachedGraphs = this.data.graphs.map((graph) => ({
-        id: graph.id,
-        tasks: graph.tasks.map((task) => ({
-          id: `${graph.id}-${task.id}`,
-          dependsOn: task.dependsOn.map((dep) => `${graph.id}-${dep}`),
-          ...(task.costMs !== undefined ? { costMs: task.costMs } : {}),
-        })),
-      }));
+      this.cachedGraphs = this.data.graphs.map((graph) =>
+        buildGraph(
+          graph.id,
+          graph.tasks.map((task) => ({
+            id: `${graph.id}-${task.id}`,
+            dependsOn: task.dependsOn.map((dep) => `${graph.id}-${dep}`),
+            ...(task.costMs !== undefined ? { costMs: task.costMs } : {}),
+          })),
+        ),
+      );
     }
     return this.cachedGraphs;
   }
@@ -177,6 +188,15 @@ export class Scenario {
     return this.data.endCondition.ms;
   }
 
+  /**
+   * When each graph should be started, as an offset (ms) from run activation.
+   * The harness drives the start; a graph is never started before it (and every
+   * other graph) has been persisted.
+   */
+  graphStartSchedule(): { graphId: GraphId; startAfterMs: number }[] {
+    return this.data.graphs.map((g) => ({ graphId: g.id, startAfterMs: g.startAfterMs }));
+  }
+
   /** Coordinator node ids (the scenario's `nodes`, excluding the implicit W). */
   coordinatorIds(): string[] {
     return this.data.nodes.map((n) => n.id);
@@ -194,7 +214,7 @@ export class Scenario {
       nodeId,
       protocol: this.data.protocol,
       nodes: this.coordinatorIds(),
-      graphs: this.graphs,
+      graphs: this.graphs.map(serializeGraph),
     };
   }
 }

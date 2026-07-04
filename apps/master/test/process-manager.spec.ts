@@ -8,6 +8,7 @@ import { EventLogService } from '../src/event-log/event-log.service';
 import { IpcServerModule } from '../src/ipc-server/ipc-server.module';
 import { NodeRegistry } from '../src/ipc-server/node-registry';
 import { ProcessManagerService } from '../src/ipc-server/process-manager.service';
+import { MetricsModule } from '../src/metrics/metrics.module';
 import { StorageService } from '../src/storage/storage.service';
 
 const distReady = existsSync(join(__dirname, '..', '..', '..', 'packages', 'ipc', 'dist', 'index.js'));
@@ -44,10 +45,12 @@ describe.runIf(distReady)('ProcessManagerService (real forks)', () => {
           env: {
             MOZART_PG_URL: '',
             OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: '',
+            OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: '',
             MOZART_LOG_DIR: logDir,
             MOZART_SLAVE_ENTRYPOINT: fixture,
           },
         }),
+        MetricsModule,
         IpcServerModule,
       ],
     }).compile();
@@ -74,8 +77,7 @@ describe.runIf(distReady)('ProcessManagerService (real forks)', () => {
     await pm.awaitAllReady(5000);
     expect(registry.liveNodeIds()).toEqual(['n1']);
 
-    // Activation makes the fixture acquire (and hold) an exclusive lock.
-    pm.activateAll();
+    // On startup the fixture acquires (and holds) an exclusive lock.
     await sleep(300);
     expect(storage.heldLeaseCount()).toBe(1);
 

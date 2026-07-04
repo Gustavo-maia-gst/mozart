@@ -30,10 +30,20 @@ export class IpcHostService {
         this.onNodeReady?.(nodeId);
         return Promise.resolve({ scenario: this.scenario.infoFor(nodeId, this.runId) });
       },
-      'transport.publish': (nodeId, { to, topic, body }) =>
-        Promise.resolve({ messageId: this.transport.publish(nodeId, to, topic, body) }),
+      'transport.toCoordinators': (nodeId, { topic, body }) => {
+        this.transport.sendToCoordinators(topic, body, nodeId);
+        return Promise.resolve({});
+      },
+      'transport.toWorkerPool': (_nodeId, { taskId }) => {
+        this.worker.start(taskId);
+        return Promise.resolve({});
+      },
       'transport.ack': (_nodeId, { deliveryId }) => {
         this.transport.ack(deliveryId);
+        return Promise.resolve({});
+      },
+      'transport.completeGraph': (_nodeId, { graphId }) => {
+        this.transport.completeGraph(graphId);
         return Promise.resolve({});
       },
       'storage.read': async (nodeId, { taskId }) => ({
@@ -54,10 +64,6 @@ export class IpcHostService {
       'storage.lease.release': async (_nodeId, { leaseId }) => {
         await this.storage.leaseRelease(leaseId);
         return {};
-      },
-      'worker.start': (nodeId, { taskId }) => {
-        this.worker.start(nodeId, taskId);
-        return Promise.resolve({});
       },
     };
   }

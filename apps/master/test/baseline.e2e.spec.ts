@@ -5,6 +5,7 @@ import { initTelemetry, type Telemetry } from '@mozart/telemetry';
 import { Test } from '@nestjs/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CoreModule } from '../src/core/core.module';
+import { MetricsModule } from '../src/metrics/metrics.module';
 import { RunModule } from '../src/run/run.module';
 import { RunService } from '../src/run/run.service';
 
@@ -61,10 +62,12 @@ describe.runIf(distReady)('baseline drives a DAG end-to-end (e2e)', () => {
           env: {
             MOZART_PG_URL: '',
             OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: '',
+            OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: '',
             MOZART_LOG_DIR: logDir,
             MOZART_SLAVE_ENTRYPOINT: slaveEntry,
           },
         }),
+        MetricsModule,
         RunModule,
       ],
     }).compile();

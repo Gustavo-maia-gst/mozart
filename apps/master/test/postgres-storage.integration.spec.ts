@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { LatencyModel } from '@mozart/latency';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { TimerScheduler } from '../src/clock/clock';
+import { SystemClock, TimerScheduler } from '../src/clock/clock';
 import type { EventInput, EventLogService } from '../src/event-log/event-log.service';
+import { MetricsService } from '../src/metrics/metrics.service';
 import { PostgresStorageAdapter } from '../src/storage/postgres.adapter';
 import { StorageService } from '../src/storage/storage.service';
 import { StorageGate } from '../src/storage/storage-gate';
@@ -39,8 +40,10 @@ describe.runIf(enabled)('PostgresStorageAdapter (integration)', () => {
       adapter,
       new LatencyModel('s', {}),
       new TimerScheduler(),
+      new SystemClock(),
       new StorageGate(),
       new FakeEventLog() as unknown as EventLogService,
+      new MetricsService(),
     );
   });
 

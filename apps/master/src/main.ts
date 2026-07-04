@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { initTelemetry } from '@mozart/telemetry';
 import { loadEnv } from './config/env';
+import { latencyResourceAttrs } from './metrics/resource-attrs';
 import { loadScenario } from './scenario/scenario';
 
 /**
@@ -45,8 +46,18 @@ async function bootstrap(): Promise<void> {
   // (which pulls in pg) is imported.
   const telemetry = initTelemetry({
     serviceName: 'harness',
-    attributes: { 'mozart.run_id': runId },
+    // These ride as resource attributes and are promoted to Prometheus labels
+    // (see prometheus.yml) — the axes for "under comms mean Y / storage mean Z,
+    // compare protocols".
+    attributes: {
+      'mozart.run_id': runId,
+      'mozart.protocol': scenario.protocol,
+      'mozart.scenario': scenario.name,
+      'mozart.seed': scenario.seed,
+      ...latencyResourceAttrs(scenario.latency),
+    },
     otlpUrl: env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+    metricsOtlpUrl: env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
     processor: env.MOZART_OTEL_PROCESSOR,
   });
 
@@ -65,7 +76,8 @@ async function bootstrap(): Promise<void> {
 
     console.log(JSON.stringify(summary, null, 2));
 
-    console.log('Jaeger: http://localhost:16686/search?service=harness');
+    console.log('Jaeger:  http://localhost:2016/search?service=harness');
+    console.log('Grafana: http://localhost:2000/d/mozart-protocol-comparison');
   } finally {
     await app.close();
     await telemetry.shutdown();

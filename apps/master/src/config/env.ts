@@ -7,8 +7,13 @@ import { z } from 'zod';
 export const envSchema = z.object({
   /** Postgres connection string for the postgres storage adapter. */
   MOZART_PG_URL: z.string().default('postgres://mozart:mozart@localhost:5432/mozart'),
-  /** OTLP traces endpoint. */
-  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: z.string().default('http://localhost:4318/v1/traces'),
+  /** OTLP traces endpoint (Jaeger OTLP http, mapped to host :2018). */
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: z.string().default('http://localhost:2018/v1/traces'),
+  /**
+   * OTLP metrics endpoint → Prometheus's OTLP receiver (mapped to host :2090).
+   * Note the path (/api/v1/otlp/v1/metrics) differs from traces.
+   */
+  OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: z.string().default('http://localhost:2090/api/v1/otlp/v1/metrics'),
   /** Directory for per-run event logs. */
   MOZART_LOG_DIR: z.string().default('runs'),
   /**

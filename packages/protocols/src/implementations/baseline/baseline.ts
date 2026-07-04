@@ -1,8 +1,12 @@
 import {
   type Graph,
   type GraphId,
+  graphId as idOf,
+  type GraphJson,
   type JsonObject,
   type Message,
+  parseGraph,
+  serializeGraph,
   type TaskId,
   type WorkerFailEvent,
   type WorkerSuccessEvent,
@@ -12,10 +16,12 @@ import { Protocol } from '../../protocol';
 
 /** In-memory bookkeeping for one graph's execution. */
 interface GraphRuntime {
+  /** The DAG itself: dependents are out-neighbours, dependencies in-neighbours. */
+  graph: Graph;
   remaining: number;
   done: Set<TaskId>;
+  /** Remaining unmet dependencies per task; a task starts when it hits 0. */
   depsLeft: Map<TaskId, number>;
-  dependents: Map<TaskId, TaskId[]>;
 }
 
 /**
@@ -35,22 +41,26 @@ export class BaselineProtocol extends Protocol {
   private readonly runtimes = new Map<GraphId, GraphRuntime>();
   private readonly taskGraph = new Map<TaskId, GraphId>();
 
-  /** Baseline's persistence layout: the entire graph under one key. */
+  /** Baseline's persistence layout: the entire graph (JSON) under one key. */
   public async persistGraph(graph: Graph): Promise<void> {
-    await this.storage.save(this.key(graph.id), { graph } as unknown as JsonObject);
-    this.log.info('graph persisted', { graphId: graph.id, tasks: graph.tasks.length });
+    const id = idOf(graph);
+    await this.storage.save(this.key(id), { graph: serializeGraph(graph) } as unknown as JsonObject);
+    this.log.info('graph persisted', { graphId: id, tasks: graph.order });
   }
 
   public async startGraph(graphId: GraphId): Promise<void> {
-    const stored = (await this.storage.read(this.key(graphId))) as { graph?: Graph } | null;
-    const graph = stored?.graph;
-    if (!graph) throw new Error(`graph ${graphId} is not persisted`);
+    const stored = (await this.storage.read(this.key(graphId))) as { graph?: GraphJson } | null;
+    if (!stored?.graph) throw new Error(`graph ${graphId} is not persisted`);
+    const graph = parseGraph(stored.graph);
 
     this.runtimes.set(graphId, this.buildRuntime(graph, graphId));
     this.log.info('graph started', { graphId });
-    for (const task of graph.tasks) {
-      if (task.dependsOn.length === 0) await this.startTask(task.id);
-    }
+
+    const roots: TaskId[] = [];
+    graph.forEachNode((node) => {
+      if (graph.inDegree(node) === 0) roots.push(node);
+    });
+    for (const root of roots) await this.startTask(root);
   }
 
   /**
@@ -70,40 +80,36 @@ export class BaselineProtocol extends Protocol {
 
   /** A single coordinator never exchanges coordination messages. */
   public async onMessage(event: Message): Promise<void> {
-    this.log.warn('unexpected coordinator message', { topic: event.topic, from: event.from });
+    this.log.warn('unexpected coordinator message', { topic: event.topic });
   }
 
   private async completeTask(runtime: GraphRuntime, taskId: TaskId): Promise<void> {
     runtime.done.add(taskId);
     runtime.remaining -= 1;
-    for (const dependent of runtime.dependents.get(taskId) ?? []) {
+    for (const dependent of runtime.graph.outNeighbors(taskId)) {
       const left = (runtime.depsLeft.get(dependent) ?? 1) - 1;
       runtime.depsLeft.set(dependent, left);
       if (left === 0) await this.startTask(dependent);
     }
     if (runtime.remaining === 0) {
-      this.log.info('graph complete', { graphId: this.taskGraph.get(taskId) ?? null });
+      const gid = this.taskGraph.get(taskId);
+      this.log.info('graph complete', { graphId: gid ?? null });
+      if (gid) await this.transport.completeGraph(gid);
     }
   }
 
   private buildRuntime(graph: Graph, graphId: GraphId): GraphRuntime {
     const depsLeft = new Map<TaskId, number>();
-    const dependents = new Map<TaskId, TaskId[]>();
-    for (const task of graph.tasks) {
-      depsLeft.set(task.id, task.dependsOn.length);
-      this.taskGraph.set(task.id, graphId);
-      for (const dep of task.dependsOn) {
-        const list = dependents.get(dep) ?? [];
-        list.push(task.id);
-        dependents.set(dep, list);
-      }
-    }
-    return { remaining: graph.tasks.length, done: new Set(), depsLeft, dependents };
+    graph.forEachNode((node) => {
+      depsLeft.set(node, graph.inDegree(node));
+      this.taskGraph.set(node, graphId);
+    });
+    return { graph, remaining: graph.order, done: new Set(), depsLeft };
   }
 
   private async startTask(taskId: TaskId): Promise<void> {
     this.log.info('start task', { taskId });
-    await this.workerPool.start(taskId);
+    await this.transport.sendToWorkerPool(taskId);
   }
 
   private runtimeOf(taskId: TaskId): GraphRuntime | undefined {

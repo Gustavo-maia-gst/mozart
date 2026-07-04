@@ -9,6 +9,8 @@ export interface QueuedMessage {
   body: Json;
   /** Trace context captured at publish; deliveries descend from it. */
   publishTraceCtx: Record<string, string>;
+  /** Clock time at publish — used to measure ack round-trip latency. */
+  publishedAt: number;
   /** Clock time at/after which the head may be delivered (publish latency). */
   deliverableAt: number;
   /** Delivery count so far (0 until first delivery). */

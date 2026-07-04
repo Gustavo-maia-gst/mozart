@@ -3,6 +3,7 @@ import { LatencyModel } from '@mozart/latency';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { CancelHandle, Clock, Scheduler } from '../clock/clock';
 import type { EventInput, EventLogService } from '../event-log/event-log.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { type DeliverySink, NetworkState } from './delivery-sink';
 import { TransportService } from './transport.service';
 
@@ -34,13 +35,18 @@ class VirtualTime implements Clock, Scheduler {
   }
 }
 
+/** Records deliveries; `live` is the round-robin candidate pool. */
 class FakeSink implements DeliverySink {
   readonly delivered: { to: NodeId; delivery: Delivery }[] = [];
+  live: NodeId[] = ['c1'];
   reachable = true;
   public deliver(to: NodeId, delivery: Delivery): boolean {
     if (!this.reachable) return false;
     this.delivered.push({ to, delivery });
     return true;
+  }
+  public liveNodeIds(): NodeId[] {
+    return this.live;
   }
 }
 
@@ -55,7 +61,7 @@ class FakeEventLog {
   }
 }
 
-const scenario = new Scenario({ transport: { ackTimeoutMs: 100 } } as ScenarioData);
+const scenario = new Scenario({ transport: { ackTimeoutMs: 100 }, graphs: [] } as unknown as ScenarioData);
 
 function build(latencyMs = 0) {
   const time = new VirtualTime();
@@ -73,6 +79,7 @@ function build(latencyMs = 0) {
     sink,
     log as unknown as EventLogService,
     network,
+    new MetricsService(),
   );
   return { time, sink, log, network, transport };
 }
@@ -83,36 +90,34 @@ describe('TransportService', () => {
     ctx = build();
   });
 
-  it('delivers FIFO with a single message outstanding per channel', () => {
+  it('delivers a message to a live coordinator', () => {
     const { transport, sink } = ctx;
-    transport.publish('n1', 'n2', 'a', { i: 1 });
-    transport.publish('n1', 'n2', 'b', { i: 2 });
-
-    // Only the head is delivered until it is acked.
+    transport.sendToCoordinators('a', { i: 1 }, 'W');
     expect(sink.delivered).toHaveLength(1);
+    expect(sink.delivered[0]?.to).toBe('c1');
     expect(sink.delivered[0]?.delivery.topic).toBe('a');
-
-    transport.ack(sink.delivered[0]!.delivery.deliveryId);
-    expect(sink.delivered).toHaveLength(2);
-    expect(sink.delivered[1]?.delivery.topic).toBe('b');
-  });
-
-  it('does not deliver the next message before the head is acked', () => {
-    const { transport, sink, time } = ctx;
-    transport.publish('n1', 'n2', 'a', {});
-    transport.publish('n1', 'n2', 'b', {});
-    time.advance(50); // well within ack timeout
-    expect(sink.delivered).toHaveLength(1);
-  });
-
-  it('redelivers the same message after the ack-visibility timeout', () => {
-    const { transport, sink, time, log } = ctx;
-    transport.publish('n1', 'n2', 'a', {});
-    expect(sink.delivered).toHaveLength(1);
     expect(sink.delivered[0]?.delivery.attempt).toBe(1);
+  });
+
+  it('round-robins across coordinators', () => {
+    const { transport, sink } = ctx;
+    sink.live = ['c1', 'c2', 'c3'];
+    transport.sendToCoordinators('a', {}, 'W');
+    transport.sendToCoordinators('b', {}, 'W');
+    transport.sendToCoordinators('c', {}, 'W');
+    expect(sink.delivered.map((d) => d.to)).toEqual(['c1', 'c2', 'c3']);
+  });
+
+  it('redelivers to the next coordinator after the ack-visibility timeout', () => {
+    const { transport, sink, time, log } = ctx;
+    sink.live = ['c1', 'c2'];
+    transport.sendToCoordinators('a', {}, 'W');
+    expect(sink.delivered).toHaveLength(1);
+    expect(sink.delivered[0]?.to).toBe('c1');
 
     time.advance(100); // ack timeout elapses with no ack
     expect(sink.delivered).toHaveLength(2);
+    expect(sink.delivered[1]?.to).toBe('c2'); // next coordinator
     expect(sink.delivered[1]?.delivery.messageId).toBe(sink.delivered[0]?.delivery.messageId);
     expect(sink.delivered[1]?.delivery.attempt).toBe(2);
     expect(log.ofType('transport.redelivered')).toHaveLength(1);
@@ -120,15 +125,15 @@ describe('TransportService', () => {
 
   it('stops redelivering once acked', () => {
     const { transport, sink, time } = ctx;
-    transport.publish('n1', 'n2', 'a', {});
+    transport.sendToCoordinators('a', {}, 'W');
     transport.ack(sink.delivered[0]!.delivery.deliveryId);
     time.advance(500);
-    expect(sink.delivered).toHaveLength(1); // no redelivery after ack
+    expect(sink.delivered).toHaveLength(1);
   });
 
   it('ignores stale/duplicate acks', () => {
     const { transport, sink } = ctx;
-    transport.publish('n1', 'n2', 'a', {});
+    transport.sendToCoordinators('a', {}, 'W');
     const id = sink.delivered[0]!.delivery.deliveryId;
     transport.ack(id);
     expect(() => transport.ack(id)).not.toThrow();
@@ -136,43 +141,44 @@ describe('TransportService', () => {
     expect(sink.delivered).toHaveLength(1);
   });
 
-  it('injects duplicate deliveries on the next delivery', () => {
+  it('injects duplicate deliveries on the next message', () => {
     const { transport, sink, log } = ctx;
-    transport.scheduleDuplicates('n1', 'n2', 2);
-    transport.publish('n1', 'n2', 'a', {});
+    transport.scheduleDuplicates(2);
+    transport.sendToCoordinators('a', {}, 'W');
     expect(sink.delivered).toHaveLength(3); // 1 real + 2 duplicates
     const ids = new Set(sink.delivered.map((d) => d.delivery.messageId));
     expect(ids.size).toBe(1); // same messageId => exercises idempotence
     expect(log.ofType('transport.duplicated')).toHaveLength(2);
   });
 
-  it('pauses a partitioned channel and resumes on unblock', () => {
+  it('parks a message when no coordinator is reachable and resumes on unblock', () => {
     const { transport, sink, network, log } = ctx;
-    network.outboundBlocked.add('n1');
-    transport.publish('n1', 'n2', 'a', {});
+    network.inboundBlocked.add('c1');
+    transport.sendToCoordinators('a', {}, 'W');
     expect(sink.delivered).toHaveLength(0);
     expect(log.ofType('transport.blocked').length).toBeGreaterThanOrEqual(1);
 
-    network.outboundBlocked.delete('n1');
+    network.inboundBlocked.delete('c1');
     transport.resumeAll();
     expect(sink.delivered).toHaveLength(1);
   });
 
+  it('drops the ack of an outbound-partitioned coordinator (keeps retrying)', () => {
+    const { transport, sink, network, time } = ctx;
+    transport.sendToCoordinators('a', {}, 'W');
+    network.outboundBlocked.add('c1');
+    transport.ack(sink.delivered[0]!.delivery.deliveryId); // dropped
+    time.advance(100);
+    expect(sink.delivered).toHaveLength(2); // redelivered despite the ack
+  });
+
   it('applies publish latency before delivery', () => {
     const c = build(50);
-    c.transport.publish('n1', 'n2', 'a', {});
+    c.transport.sendToCoordinators('a', {}, 'W');
     expect(c.sink.delivered).toHaveLength(0);
     c.time.advance(49);
     expect(c.sink.delivered).toHaveLength(0);
     c.time.advance(1);
     expect(c.sink.delivered).toHaveLength(1);
-  });
-
-  it('keeps channels independent', () => {
-    const { transport, sink } = ctx;
-    transport.publish('n1', 'n2', 'a', {});
-    transport.publish('n3', 'n2', 'b', {});
-    // Different (from,to) channels => both heads deliver independently.
-    expect(sink.delivered.map((d) => d.delivery.topic).sort()).toEqual(['a', 'b']);
   });
 });

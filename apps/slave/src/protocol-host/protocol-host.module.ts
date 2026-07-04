@@ -1,8 +1,8 @@
-import { ProtocolLogger, StoragePort, TransportPort, WorkerPoolPort } from '@mozart/contracts';
+import { ProtocolLogger, StoragePort, TransportPort } from '@mozart/contracts';
 import { Protocol, resolveProtocol } from '@mozart/protocols';
 import { type DynamicModule, Module } from '@nestjs/common';
 import { HarnessClientModule } from '../harness-client/harness-client.module';
-import { StorageClient, TransportClient, WorkerPoolClient } from '../harness-client/ports';
+import { StorageClient, TransportClient } from '../harness-client/ports';
 import { ProtocolHostService } from './protocol-host.service';
 import { SpanLogger } from './span-logger';
 
@@ -21,7 +21,6 @@ export class ProtocolHostModule {
         { provide: Protocol, useClass: resolveProtocol(name) },
         { provide: TransportPort, useExisting: TransportClient },
         { provide: StoragePort, useExisting: StorageClient },
-        { provide: WorkerPoolPort, useExisting: WorkerPoolClient },
         { provide: ProtocolLogger, useClass: SpanLogger },
         ProtocolHostService,
       ],

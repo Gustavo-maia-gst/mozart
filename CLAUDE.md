@@ -7,7 +7,9 @@ como processos slave stateless contra um kernel (master) que simula o mundo exte
 ## Comandos
 
 ```bash
-docker compose up -d        # jaeger (UI: localhost:16686, OTLP: 4318) + postgres (5432)
+# grafana (UI :2000, dashboards provisionados de grafana/) + prometheus (:2090,
+# OTLP metrics receiver) + jaeger (UI :2016, OTLP http :2018) + postgres (:5432)
+docker compose up -d
 pnpm install
 pnpm build                  # tsc -b (project references)
 pnpm test                   # vitest, unit
@@ -47,12 +49,14 @@ Direção de dependência: `apps → packages`; `packages → contracts` apenas.
 5. **Canais/redeliveries são chaveados por `nodeId`**, nunca por handle de processo
    (restart re-anexa).
 6. **O event log JSONL é a fonte de verdade** pra corretude (carimba trace/span
-   id via `activeIds`). O harness é _quase silencioso em traces_: emite só
-   `transport.redeliver` (métrica de redelivery) e `worker.execute` (um span por
-   task, aberto no `worker.start` e fechado no complete/fail — cobre a duração
-   simulada). O resto da árvore vive nos coordinators (um service OTel por
-   coordinator, nomeado no YAML). Spans de slave são best-effort (SIGKILL pode
-   perder a janela do BatchSpanProcessor).
+   id via `activeIds`). O harness é _quase silencioso em traces_: emite `run`
+   (span-raiz único da run — a ativação roda sob ele, então TODOS os grafos e
+   passos descem daí e viram UM trace só, não um por grafo), `transport.redeliver`
+   (métrica de redelivery) e `worker.execute` (um span por task, aberto no
+   `worker.start` e fechado no complete/fail — cobre a duração simulada). O resto
+   da árvore vive nos coordinators (um service OTel por coordinator, nomeado no
+   YAML). Spans de slave são best-effort (SIGKILL pode perder a janela do
+   BatchSpanProcessor).
 7. Payloads IPC/mensagens são JSON puro (tipo `Json` em contracts): sem Date/Map/
    BigInt/undefined/NaN. Zod valida nas duas bordas.
 

@@ -11,6 +11,8 @@ export const DELIVERY_SINK = Symbol('DELIVERY_SINK');
  */
 export interface DeliverySink {
   deliver(to: NodeId, delivery: Delivery): boolean;
+  /** Live coordinator ids — the transport's round-robin dispatch targets. */
+  liveNodeIds(): NodeId[];
 }
 
 /**

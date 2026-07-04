@@ -2,12 +2,12 @@ import { IpcClient, processFrameChannel } from '@mozart/ipc';
 import { traceContextHooks } from '@mozart/telemetry';
 import { Module } from '@nestjs/common';
 import { IPC_CLIENT } from '../tokens';
-import { StorageClient, TransportClient, WorkerPoolClient } from './ports';
+import { StorageClient, TransportClient } from './ports';
 
 /**
- * Provides the single IpcClient to the parent (master) and the three ports
- * backed by it. Telemetry hooks inject the active client-span context into
- * every outgoing frame, so master-side server spans parent correctly.
+ * Provides the single IpcClient to the parent (master) and the ports backed by
+ * it. Telemetry hooks inject the active client-span context into every outgoing
+ * frame, so master-side server spans parent correctly.
  */
 @Module({
   providers: [
@@ -17,8 +17,7 @@ import { StorageClient, TransportClient, WorkerPoolClient } from './ports';
     },
     TransportClient,
     StorageClient,
-    WorkerPoolClient,
   ],
-  exports: [IPC_CLIENT, TransportClient, StorageClient, WorkerPoolClient],
+  exports: [IPC_CLIENT, TransportClient, StorageClient],
 })
 export class HarnessClientModule {}

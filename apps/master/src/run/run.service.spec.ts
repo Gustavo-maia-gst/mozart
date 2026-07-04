@@ -3,6 +3,7 @@ import { Scenario } from '@mozart/contracts';
 import { Test } from '@nestjs/testing';
 import { afterAll, describe, expect, it } from 'vitest';
 import { CoreModule } from '../core/core.module';
+import { MetricsModule } from '../metrics/metrics.module';
 import { RunModule } from './run.module';
 import { RunService } from './run.service';
 
@@ -33,9 +34,11 @@ describe('RunService (skeleton)', () => {
           env: {
             MOZART_PG_URL: '',
             OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: '',
+            OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: '',
             MOZART_LOG_DIR: logDir,
           },
         }),
+        MetricsModule,
         RunModule,
       ],
     }).compile();

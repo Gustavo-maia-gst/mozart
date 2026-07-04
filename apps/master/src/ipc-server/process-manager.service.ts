@@ -1,13 +1,15 @@
 import { type ChildProcess, fork } from 'node:child_process';
 import { join } from 'node:path';
-import type { NodeId, Scenario } from '@mozart/contracts';
+import { CONTROL_TOPICS, type GraphId, type NodeId, type Scenario } from '@mozart/contracts';
 import { childFrameChannel, NodeLink, type RpcHandlers } from '@mozart/ipc';
 import { traceContextHooks } from '@mozart/telemetry';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { EnvConfig } from '../config/env';
 import { EventLogService } from '../event-log/event-log.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { StorageService } from '../storage/storage.service';
 import { ENV_CONFIG, RUN_ID, SCENARIO } from '../tokens';
+import { TransportService } from '../transport/transport.service';
 import { IpcHostService } from './ipc-host.service';
 import { NodeRegistry } from './node-registry';
 
@@ -39,6 +41,8 @@ export class ProcessManagerService {
     private readonly registry: NodeRegistry,
     private readonly storage: StorageService,
     private readonly events: EventLogService,
+    private readonly metrics: MetricsService,
+    private readonly transport: TransportService,
   ) {
     this.handlers = this.ipcHost.buildHandlers();
     this.ipcHost.onNodeReady = (nodeId) => this.markReady(nodeId);
@@ -61,6 +65,7 @@ export class ProcessManagerService {
         MOZART_PROTOCOL: this.scenario.protocol,
         MOZART_RUN_ID: this.runId,
         OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: this.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+        OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: this.env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
         ...(this.env.MOZART_OTEL_PROCESSOR ? { MOZART_OTEL_PROCESSOR: this.env.MOZART_OTEL_PROCESSOR } : {}),
       },
     });
@@ -70,6 +75,7 @@ export class ProcessManagerService {
     this.slaves.set(nodeId, { child, injectedKill: false });
     link.onClose(() => void this.onExit(nodeId));
     this.events.record({ type: 'node.spawned', nodeId });
+    this.metrics.countNodeLifecycle('spawned');
   }
 
   /** SIGKILL a node. `injected` distinguishes fault kills from shutdown kills. */
@@ -77,19 +83,28 @@ export class ProcessManagerService {
     const slave = this.slaves.get(nodeId);
     if (!slave) return;
     slave.injectedKill = injected;
-    if (injected) this.events.record({ type: 'node.killed', nodeId });
+    if (injected) {
+      this.events.record({ type: 'node.killed', nodeId });
+      this.metrics.countNodeLifecycle('killed');
+    }
     slave.child.kill('SIGKILL');
   }
 
   public restart(nodeId: NodeId): void {
     this.events.record({ type: 'node.restarted', nodeId });
+    this.metrics.countNodeLifecycle('restarted');
     this.spawn(nodeId); // fresh, stateless; link rebound under same nodeId
   }
 
-  public activateAll(): void {
-    for (const nodeId of this.registry.liveNodeIds()) {
-      this.registry.get(nodeId)?.push('protocol.activate', {});
-    }
+  /**
+   * Start one (already-persisted) graph by sending `graph.start` to the
+   * coordinators, under the graph's lifetime span so the message (and everything
+   * it triggers) nests beneath it.
+   */
+  public startGraph(graphId: GraphId): void {
+    this.transport.beginGraph(graphId, () => {
+      this.transport.sendToCoordinators(CONTROL_TOPICS.graphStart, { graphId }, 'harness');
+    });
   }
 
   /** Graceful shutdown: ask protocols to deactivate, then SIGKILL survivors. */
@@ -117,6 +132,7 @@ export class ProcessManagerService {
   private markReady(nodeId: NodeId): void {
     this.ready.add(nodeId);
     this.events.record({ type: 'node.ready', nodeId });
+    this.metrics.countNodeLifecycle('ready');
     this.readyCheck?.();
   }
 
@@ -127,6 +143,7 @@ export class ProcessManagerService {
     this.registry.unregister(nodeId);
     this.ready.delete(nodeId);
     this.events.record({ type: 'node.exited', nodeId, data: { injected } });
+    this.metrics.countNodeLifecycle('exited');
     // Free any locks the dead node held or was waiting on.
     await this.storage.releaseNode(nodeId).catch((err: unknown) => {
       this.logger.warn(`releaseNode(${nodeId}) failed: ${String(err)}`);

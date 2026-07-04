@@ -10,7 +10,9 @@ async function bootstrap(): Promise<void> {
 
   const telemetry = initTelemetry({
     serviceName: name,
-    attributes: { 'mozart.node_id': nodeId, 'mozart.run_id': runId },
+    // Slaves are not metric-instrumented (master-only), but stamping protocol
+    // keeps their *traces* filterable by protocol at no cost.
+    attributes: { 'mozart.node_id': nodeId, 'mozart.run_id': runId, 'mozart.protocol': protocol },
     processor: process.env.MOZART_OTEL_PROCESSOR as 'batch' | 'simple' | undefined,
   });
 

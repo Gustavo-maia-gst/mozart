@@ -12,6 +12,7 @@
     "@mozart/contracts": "workspace:*",
     "@mozart/ipc": "workspace:*",
     "@mozart/latency": "workspace:*",
+    "@mozart/protocols": "workspace:*",
     "@mozart/telemetry": "workspace:*",
     "@nestjs/common": "^11.1.0",
     "@nestjs/config": "^4.0.0",
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@nestjs/testing": "^11.1.0",
+    "@opentelemetry/sdk-metrics": "^2.5.0",
     "@types/pg": "^8.15.0"
   }
 }

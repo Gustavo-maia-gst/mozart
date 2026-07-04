@@ -1,0 +1,21 @@
+# Same baseline DAG as baseline.yaml but with higher communication + storage
+# latency — a second data point for the Grafana "protocol comparison" dashboard
+# (compare the same protocol across latency regimes).
+name: baseline-slow
+seed: 1
+protocol: baseline
+nodes: [{ id: n1, name: coordinator }]
+graphs:
+  - id: g0
+    tasks:
+      - { id: a, costMs: 50 }
+      - { id: b, dependsOn: [a], costMs: 50 }
+      - { id: c, dependsOn: [a], costMs: 50 }
+      - { id: d, dependsOn: [b, c], costMs: 50 }
+storage: { adapter: in-memory }
+transport: { ackTimeoutMs: 2000 }
+latency:
+  transport.deliver: { distribution: constant, value: 40 }
+  storage.read: { distribution: constant, value: 20 }
+  storage.save: { distribution: constant, value: 20 }
+endCondition: { type: timeout, ms: 1500 }
