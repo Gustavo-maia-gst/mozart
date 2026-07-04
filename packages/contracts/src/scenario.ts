@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Graph } from './graph';
 
 /** Action types the latency model knows about out of the box. */
 export const KNOWN_LATENCY_ACTIONS = [
@@ -111,4 +112,11 @@ export interface ScenarioInfo {
   /** All coordinator node ids (excluding `W`). */
   nodes: string[];
   dag: DagSpec;
+  /** Concurrent DAGs to coordinate. Derived from `dag` (as graph `g0`) for now. */
+  graphs: Graph[];
+}
+
+/** The scenario's DAG as a single graph `g0` (until multi-graph scenarios land). */
+export function graphsFromScenario(scenario: Scenario): Graph[] {
+  return [{ id: 'g0', tasks: scenario.dag.tasks }];
 }

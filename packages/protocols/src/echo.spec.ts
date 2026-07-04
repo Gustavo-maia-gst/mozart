@@ -44,7 +44,14 @@ function makeCtx(tasks: { id: string; dependsOn: string[] }[] = [{ id: 't1', dep
   };
   const ctx: ProtocolContext = {
     nodeId: 'n1',
-    scenario: { runId: 'r', nodeId: 'n1', protocol: 'echo', nodes: ['n1', 'n2'], dag: { tasks } },
+    scenario: {
+      runId: 'r',
+      nodeId: 'n1',
+      protocol: 'echo',
+      nodes: ['n1', 'n2'],
+      dag: { tasks },
+      graphs: [{ id: 'g0', tasks }],
+    },
     transport,
     storage,
     workers,

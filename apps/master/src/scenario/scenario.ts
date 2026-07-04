@@ -1,5 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { type Scenario, type ScenarioInfo, scenarioSchema } from '@mozart/contracts';
+import {
+  graphsFromScenario,
+  type Scenario,
+  type ScenarioInfo,
+  scenarioSchema,
+} from '@mozart/contracts';
 import { parse } from 'yaml';
 
 /** Loads and validates a scenario YAML file. Throws with a readable zod error. */
@@ -21,5 +26,6 @@ export function scenarioInfoFor(scenario: Scenario, runId: string, nodeId: strin
     protocol: scenario.protocol,
     nodes: coordinatorIds(scenario),
     dag: scenario.dag,
+    graphs: graphsFromScenario(scenario),
   };
 }

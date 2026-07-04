@@ -39,18 +39,14 @@ export class FaultInjectorService {
   }
 
   private apply(fault: FaultSpec): void {
-    switch (fault.action) {
-      case 'killNode':
-        return this.killNode(fault.node, fault.restartAfterMs);
-      case 'storageOutage':
-        return this.storageOutage(fault.scope, fault.durationMs);
-      case 'partitionNode':
-        return this.partitionNode(fault.node, fault.durationMs, fault.direction);
-      case 'duplicateDeliveries':
-        return this.duplicateDeliveries(fault.from, fault.to, fault.extraCopies);
-      case 'failTask':
-        return this.failTask(fault.taskId);
-    }
+    const dispatch: { [K in FaultSpec['action']]: (f: Extract<FaultSpec, { action: K }>) => void } = {
+      killNode: (f) => this.killNode(f.node, f.restartAfterMs),
+      storageOutage: (f) => this.storageOutage(f.scope, f.durationMs),
+      partitionNode: (f) => this.partitionNode(f.node, f.durationMs, f.direction),
+      duplicateDeliveries: (f) => this.duplicateDeliveries(f.from, f.to, f.extraCopies),
+      failTask: (f) => this.failTask(f.taskId),
+    };
+    (dispatch[fault.action] as (f: FaultSpec) => void)(fault);
   }
 
   killNode(nodeId: NodeId, restartAfterMs?: number): void {
