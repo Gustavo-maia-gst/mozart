@@ -1,4 +1,4 @@
-import type { Scenario } from '@mozart/contracts';
+import { criticalPathCost, graphId, type Scenario } from '@mozart/contracts';
 import { annotateSpan, ATTR, Trace } from '@mozart/telemetry';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Clock, Scheduler } from '../clock/clock';
@@ -13,6 +13,8 @@ import { ActivationService } from './activation.service';
 
 const READY_TIMEOUT_MS = 10_000;
 const DRAIN_MS = 300;
+/** Max time to wait for slaves to flush + exit on SIGTERM before SIGKILL. */
+const SHUTDOWN_GRACE_MS = 2_000;
 
 export interface RunOptions {
   dryRun?: boolean;
@@ -73,8 +75,8 @@ export class RunService {
     // the shutdown drain, so its extent matches the first start → last end.
     await this.coordinate();
 
-    this.pm.shutdown();
-    await this.sleep(DRAIN_MS); // let deactivate/exit + trailing events land
+    await this.pm.shutdown(SHUTDOWN_GRACE_MS); // SIGTERM + wait for flush/exit, SIGKILL stragglers
+    await this.sleep(DRAIN_MS); // let trailing events land
   }
 
   /**
@@ -95,6 +97,8 @@ export class RunService {
     this.faults.arm(); // fault `at` offsets count from activation
     this.scheduleGraphStarts(); // start offsets also count from activation
 
+    this.metrics.observeCriticalPath(this.criticalPathMs());
+
     const outcome = await this.transport.awaitAllGraphsComplete(this.scenario.endConditionMs);
     this.logger.log(outcome === 'complete' ? 'all graphs complete' : 'end condition (timeout) reached');
 
@@ -102,6 +106,20 @@ export class RunService {
     // completion (e.g. the DAG never finished) — then we record nothing.
     const lastCompletion = this.worker.lastCompletionAt();
     if (lastCompletion !== undefined) this.metrics.observeMakespan(lastCompletion - activatedAt);
+  }
+
+  /**
+   * Theoretical makespan floor from activation: the latest ideal finish across
+   * all graphs, each being its start offset plus its critical-path cost (longest
+   * cost-weighted path). `makespan - criticalPath` is the coordination overhead.
+   */
+  private criticalPathMs(): number {
+    const startById = new Map(this.scenario.graphStartSchedule().map((g) => [g.graphId, g.startAfterMs]));
+    let floor = 0;
+    for (const graph of this.scenario.graphs) {
+      floor = Math.max(floor, (startById.get(graphId(graph)) ?? 0) + criticalPathCost(graph));
+    }
+    return floor;
   }
 
   /**

@@ -16,8 +16,10 @@
     "lint": "biome check",
     "lint:fix": "biome check --fix --unsafe",
     "demo": "pnpm build && node apps/master/dist/main.js --scenario scenarios/baseline.yaml",
+    "scenario:from-csv": "tsx scripts/csv-to-scenario.ts",
+    "schema:gen": "tsx scripts/gen-scenario-schema.ts",
     "start": "pnpm build && node apps/master/dist/main.js",
-    "traces:clean": "docker compose restart jaeger"
+    "telemetry:clean": "docker compose up -d --force-recreate jaeger prometheus"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",

@@ -27,6 +27,7 @@ export class MetricsService {
   private readonly ackLatency: Histogram;
   private readonly lockWait: Histogram;
   private readonly makespan: Histogram;
+  private readonly criticalPath: Histogram;
 
   // Counters.
   private readonly messages: Counter;
@@ -66,6 +67,10 @@ export class MetricsService {
       unit: 'ms',
       description: 'End-to-end run makespan (activation→last completion).',
     });
+    this.criticalPath = meter.createHistogram('mozart.dag.critical_path', {
+      unit: 'ms',
+      description: 'Theoretical makespan floor: max cost-weighted path (+ start offset) across graphs.',
+    });
 
     this.messages = meter.createCounter('mozart.messages', { description: 'Transport messages by lifecycle type.' });
     this.storageOps = meter.createCounter('mozart.storage.ops', { description: 'Storage operations by op.' });
@@ -99,6 +104,9 @@ export class MetricsService {
   }
   public observeMakespan(ms: number): void {
     this.makespan.record(ms);
+  }
+  public observeCriticalPath(ms: number): void {
+    this.criticalPath.record(ms);
   }
 
   // --- counters --------------------------------------------------------------

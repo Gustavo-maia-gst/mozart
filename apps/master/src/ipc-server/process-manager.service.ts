@@ -107,12 +107,18 @@ export class ProcessManagerService {
     });
   }
 
-  /** Graceful shutdown: ask protocols to deactivate, then SIGKILL survivors. */
-  public shutdown(): void {
-    for (const nodeId of this.registry.liveNodeIds()) {
-      this.registry.get(nodeId)?.push('protocol.deactivate', {});
-    }
-    for (const nodeId of [...this.slaves.keys()]) this.kill(nodeId, false);
+  /**
+   * Graceful shutdown: SIGTERM every slave (it flushes telemetry and exits on
+   * its own), wait for them to exit up to `graceMs`, then SIGKILL any survivor.
+   * The wait is what lets the slave's final trace batch reach Jaeger — an
+   * immediate SIGKILL would drop the last spans (orphaned worker.execute).
+   */
+  public async shutdown(graceMs: number): Promise<void> {
+    const slaves = [...this.slaves.values()];
+    const exits = slaves.map((s) => new Promise<void>((resolve) => s.child.once('exit', () => resolve())));
+    for (const s of slaves) s.child.kill('SIGTERM');
+    await Promise.race([Promise.all(exits), new Promise<void>((resolve) => setTimeout(resolve, graceMs))]);
+    for (const nodeId of [...this.slaves.keys()]) this.kill(nodeId, false); // SIGKILL stragglers
   }
 
   public awaitAllReady(timeoutMs: number): Promise<void> {

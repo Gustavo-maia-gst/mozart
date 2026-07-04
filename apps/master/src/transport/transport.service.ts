@@ -6,6 +6,7 @@ import {
   ATTR,
   injectActiveContext,
   runWithExtractedContext,
+  serviceTracer,
   SpanKind,
   Trace,
   TRACER_NAME,
@@ -19,6 +20,13 @@ import { CLOCK, LATENCY_MODEL, SCENARIO, SCHEDULER } from '../tokens';
 import { DELIVERY_SINK, type DeliverySink, NetworkState } from './delivery-sink';
 
 const tracer = trace.getTracer(TRACER_NAME);
+/**
+ * The simulated broker renders as its own service (⇒ its own colour/lane in
+ * Jaeger/Grafana), distinct from the run's main service. Only the message-
+ * transport spans (queue residency + redelivery) live here; control-plane spans
+ * like startGraph stay on the main service.
+ */
+export const TRANSPORT_SERVICE = 'transport';
 const DELIVER_LATENCY = 'transport.deliver';
 
 /** One in-flight message on the coordinators queue, awaiting an ack. */
@@ -112,7 +120,7 @@ export class TransportService {
     this.messages.set(messageId, msg);
     // Span for the queue-residency: opened here (child of the sender's active
     // span), closed on first delivery. Captures deliver latency + any block wait.
-    msg.queueSpan = tracer.startSpan(`transport.enqueue(${topic})`, {
+    msg.queueSpan = serviceTracer(TRANSPORT_SERVICE).startSpan(`transport.enqueue(${topic})`, {
       attributes: { [ATTR.from]: origin, [ATTR.messageId]: messageId, [ATTR.topic]: topic },
     });
     this.events.record({ type: 'transport.published', nodeId: origin, messageId, data: { topic } });
@@ -243,7 +251,11 @@ export class TransportService {
     this.metrics.inflightAdded();
   }
 
-  @Trace({ name: (msg: Pending) => `transport.redeliver(${msg.topic})`, kind: SpanKind.PRODUCER })
+  @Trace({
+    name: (msg: Pending) => `transport.redeliver(${msg.topic})`,
+    kind: SpanKind.PRODUCER,
+    service: TRANSPORT_SERVICE,
+  })
   private emitRedelivery(msg: Pending, target: NodeId, deliveryId: string): void {
     annotateSpan({
       [ATTR.from]: msg.origin,

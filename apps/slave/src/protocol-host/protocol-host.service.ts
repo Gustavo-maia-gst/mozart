@@ -36,6 +36,12 @@ interface BufferedPush {
 @Injectable()
 export class ProtocolHostService {
   private readonly logger = new Logger(ProtocolHostService.name);
+  /**
+   * Flush hook set by `main` (telemetry.shutdown). Awaited on graceful
+   * deactivate before the process exits, so the BatchSpanProcessor's final span
+   * batch is exported instead of dying with the process.
+   */
+  public onShutdown?: () => Promise<void>;
   private ready = false;
   private readonly buffer: BufferedPush[] = [];
   /** Serializes dispatch so pushes/deliveries run one at a time, in arrival order. */
@@ -75,7 +81,10 @@ export class ProtocolHostService {
 
   private async dispatch(type: PushType, payload: unknown): Promise<void> {
     if (type === 'protocol.deactivate') {
-      process.exit(0); // graceful shutdown; telemetry flush happens in main
+      // Graceful shutdown: await the telemetry flush, then exit. Without the
+      // await, process.exit races the async OTLP export and drops the last batch.
+      await this.onShutdown?.();
+      process.exit(0);
     } else if (type === 'delivery') {
       await this.runDelivery(payload as Delivery);
     }

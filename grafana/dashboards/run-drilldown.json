@@ -11,10 +11,21 @@
     "list": [
       { "name": "datasource", "type": "datasource", "query": "prometheus", "current": {}, "hide": 0 },
       {
+        "name": "scenario",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": { "query": "label_values(mozart_messages_total, mozart_scenario)", "refId": "sc" },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "current": {},
+        "label": "Scenario"
+      },
+      {
         "name": "run",
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "query": { "query": "label_values(mozart_messages_total, mozart_run_id)", "refId": "r" },
+        "query": { "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_run_id)", "refId": "r" },
         "refresh": 2,
         "sort": 5,
         "includeAll": false,

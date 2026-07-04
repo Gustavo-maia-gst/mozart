@@ -6,7 +6,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/*.spec.ts"]
+    "includes": ["**", "!**/*.spec.ts", "!scenarios/scenario.schema.json"]
   },
   "formatter": {
     "enabled": true,

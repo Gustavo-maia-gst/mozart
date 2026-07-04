@@ -57,6 +57,35 @@ export function graphId(graph: Graph): GraphId {
   return graph.getAttribute('id');
 }
 
+/**
+ * Critical-path cost of a DAG (ms): the maximum, over every path, of the sum of
+ * each task's {@link TaskAttributes.costMs} (absent cost counts as 0). It is the
+ * theoretical floor on the graph's makespan — the time to finish it with
+ * infinite workers and zero coordination overhead. Computed by memoized longest
+ * weighted path from the roots (in-degree-0 nodes); the graph is a DAG so the
+ * recursion terminates.
+ */
+export function criticalPathCost(graph: Graph): number {
+  const memo = new Map<TaskId, number>();
+  const longestTo = (node: TaskId): number => {
+    const cached = memo.get(node);
+    if (cached !== undefined) return cached;
+    const own = graph.getNodeAttribute(node, 'costMs') ?? 0;
+    let best = 0;
+    graph.forEachInNeighbor(node, (dep) => {
+      best = Math.max(best, longestTo(dep));
+    });
+    const total = own + best;
+    memo.set(node, total);
+    return total;
+  };
+  let max = 0;
+  graph.forEachNode((node) => {
+    max = Math.max(max, longestTo(node));
+  });
+  return max;
+}
+
 /** Serialize a graph to its JSON form for IPC/storage. */
 export function serializeGraph(graph: Graph): GraphJson {
   return graph.export();

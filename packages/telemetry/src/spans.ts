@@ -1,6 +1,6 @@
 import { type Attributes, type Span, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
 import { currentScope } from './context-store';
-import { TRACER_NAME } from './telemetry';
+import { serviceTracer, TRACER_NAME } from './telemetry';
 
 /** Mozart span/attribute keys (mixed with standard messaging.* where they exist). */
 export const ATTR = {
@@ -35,6 +35,11 @@ export interface TraceOptions {
    */
   name?: string | SpanNameBuilder;
   kind?: SpanKind;
+  /**
+   * Emit under this `service.name` instead of the run's main service — giving
+   * the span its own colour/lane in Jaeger/Grafana (see {@link serviceTracer}).
+   */
+  service?: string;
 }
 
 /** Adds attributes to the currently active span (e.g. per-call dynamic values). */
@@ -62,10 +67,11 @@ function stampScope(span: Span): void {
 }
 
 /** Wraps a method so each call runs inside an active span. */
-function wrap(original: AnyFn, name: string | SpanNameBuilder, kind?: SpanKind): AnyFn {
+function wrap(original: AnyFn, name: string | SpanNameBuilder, kind?: SpanKind, service?: string): AnyFn {
   return function (this: unknown, ...args: unknown[]): unknown {
     const spanName = typeof name === 'function' ? name(...args) : name;
-    return trace.getTracer(TRACER_NAME).startActiveSpan(spanName, { kind: kind ?? SpanKind.INTERNAL }, (span) => {
+    const tracer = service ? serviceTracer(service) : trace.getTracer(TRACER_NAME);
+    return tracer.startActiveSpan(spanName, { kind: kind ?? SpanKind.INTERNAL }, (span) => {
       stampScope(span);
       try {
         const result = original.apply(this, args);
@@ -106,7 +112,7 @@ function decorateMethod(
   if (typeof descriptor.value !== 'function') return;
   const className = (target as { constructor: { name: string } }).constructor.name;
   const spanName = opts.name ?? `${className}.${String(key)}`;
-  descriptor.value = wrap(descriptor.value as AnyFn, spanName, opts.kind);
+  descriptor.value = wrap(descriptor.value as AnyFn, spanName, opts.kind, opts.service);
 }
 
 function decorateClass(ctor: { name: string; prototype: object }, opts: TraceOptions): void {
@@ -116,7 +122,7 @@ function decorateClass(ctor: { name: string; prototype: object }, opts: TraceOpt
     if (key === 'constructor') continue;
     const descriptor = Object.getOwnPropertyDescriptor(ctor.prototype, key);
     if (!descriptor || typeof descriptor.value !== 'function') continue;
-    descriptor.value = wrap(descriptor.value as AnyFn, `${prefix}.${key}`, opts.kind);
+    descriptor.value = wrap(descriptor.value as AnyFn, `${prefix}.${key}`, opts.kind, opts.service);
     Object.defineProperty(ctor.prototype, key, descriptor);
   }
 }

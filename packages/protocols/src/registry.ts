@@ -1,10 +1,12 @@
 import type { Type } from '@nestjs/common';
 import { BaselineProtocol } from './implementations/baseline/baseline';
+import { TopologicalBarrierProtocol } from './implementations/pull_based/topological_barrier';
 import type { Protocol } from './protocol';
 
 /** Name -> protocol class. Slaves resolve their protocol by MOZART_PROTOCOL. */
 export const PROTOCOLS: Record<string, Type<Protocol>> = {
   baseline: BaselineProtocol,
+  'topological-barrier': TopologicalBarrierProtocol,
 };
 
 export function resolveProtocol(name: string): Type<Protocol> {

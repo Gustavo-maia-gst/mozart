@@ -66,7 +66,7 @@ describe.runIf(distReady)('ProcessManagerService (real forks)', () => {
   });
 
   afterEach(async () => {
-    pm.shutdown();
+    await pm.shutdown(1000);
     await moduleRef.close();
   });
 

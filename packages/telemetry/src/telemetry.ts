@@ -51,6 +51,46 @@ export interface Telemetry {
 }
 
 /**
+ * Config captured by {@link initTelemetry} so {@link serviceTracer} can mint
+ * extra tracers under a different `service.name` — the only lever that gives a
+ * span a distinct colour in Jaeger/Grafana (both colour by service). They share
+ * this run's OTLP endpoint (their own exporter, same url) so their spans land in
+ * the same backend and, via the ambient context, the same trace tree.
+ */
+interface AuxConfig {
+  url: string;
+  kind: 'batch' | 'simple';
+  batchDelayMs: number;
+  baseAttrs: Record<string, string>;
+}
+let auxConfig: AuxConfig | undefined;
+const auxProviders = new Map<string, NodeTracerProvider>();
+
+/**
+ * A tracer whose spans carry `service.name = serviceName` instead of the run's
+ * main service — so they render as their own colour/lane in Jaeger and Grafana.
+ * Parenting still follows the active context, so the spans nest in the same
+ * trace. Falls back to the global tracer if telemetry isn't initialised yet.
+ */
+export function serviceTracer(serviceName: string): Tracer {
+  if (!auxConfig) return trace.getTracer(TRACER_NAME);
+  let provider = auxProviders.get(serviceName);
+  if (!provider) {
+    const resource = resourceFromAttributes({ [ATTR_SERVICE_NAME]: serviceName, ...auxConfig.baseAttrs });
+    const exporter = new OTLPTraceExporter({ url: auxConfig.url });
+    const processor: SpanProcessor =
+      auxConfig.kind === 'simple'
+        ? new SimpleSpanProcessor(exporter)
+        : new BatchSpanProcessor(exporter, { scheduledDelayMillis: auxConfig.batchDelayMs });
+    // Deliberately NOT registered globally: we hand its tracer out directly, so
+    // the global provider + context manager stay the ones from initTelemetry.
+    provider = new NodeTracerProvider({ resource, spanProcessors: [processor] });
+    auxProviders.set(serviceName, provider);
+  }
+  return provider.getTracer(TRACER_NAME);
+}
+
+/**
  * Must be called before any instrumented module is imported. Registers a
  * global tracer provider with the default W3C propagator and AsyncLocalStorage
  * context manager (so `context.active()` follows async flow within a process),
@@ -79,6 +119,14 @@ export function initTelemetry(opts: InitTelemetryOptions): Telemetry {
 
   const provider = new NodeTracerProvider({ resource, spanProcessors: [processor] });
   provider.register();
+
+  // Let serviceTracer() mint distinctly-coloured tracers sharing this endpoint.
+  auxConfig = {
+    url,
+    kind,
+    batchDelayMs: opts.batchDelayMs ?? 200,
+    baseAttrs: opts.attributes ?? {},
+  };
 
   // --- Metrics --------------------------------------------------------------
   const metricsUrl =
@@ -119,6 +167,11 @@ export function initTelemetry(opts: InitTelemetryOptions): Telemetry {
       // Swallow metric errors (no backend ⇒ export fails) so a run never breaks.
       await meterProvider.forceFlush().catch(() => {});
       await meterProvider.shutdown().catch(() => {});
+      // Aux tracers first: flush + close each distinct-service provider before
+      // the main one, then reset so a later init starts clean.
+      for (const aux of auxProviders.values()) await aux.shutdown().catch(() => {});
+      auxProviders.clear();
+      auxConfig = undefined;
       await provider.shutdown();
     },
   };

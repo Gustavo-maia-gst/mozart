@@ -24,10 +24,20 @@ async function bootstrap(): Promise<void> {
     logger: ['warn', 'error'],
   });
 
-  // Graceful deactivate exits the process; ensure telemetry is flushed on exit.
+  // Graceful shutdown: flush telemetry (final trace batch) *before* exiting.
+  // SIGTERM is the master's shutdown signal; it fires promptly regardless of the
+  // slave's IPC queue, unlike the protocol.deactivate push (kept as a fallback).
+  // 'exit' can't run async, so it's only a best-effort net for other exit paths.
+  const gracefulExit = async (): Promise<void> => {
+    await telemetry.shutdown().catch(() => {});
+    process.exit(0);
+  };
+  const host = app.get(ProtocolHostService);
+  host.onShutdown = () => telemetry.shutdown();
+  process.on('SIGTERM', () => void gracefulExit());
   process.on('exit', () => void telemetry.shutdown());
 
-  await app.get(ProtocolHostService).start();
+  await host.start();
   // The IPC channel keeps the event loop alive; we return and wait for pushes.
 }
 

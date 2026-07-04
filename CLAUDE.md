@@ -55,8 +55,14 @@ Direção de dependência: `apps → packages`; `packages → contracts` apenas.
    (métrica de redelivery) e `worker.execute` (um span por task, aberto no
    `worker.start` e fechado no complete/fail — cobre a duração simulada). O resto
    da árvore vive nos coordinators (um service OTel por coordinator, nomeado no
-   YAML). Spans de slave são best-effort (SIGKILL pode perder a janela do
-   BatchSpanProcessor).
+   YAML). Os spans de transport (`transport.enqueue`/`transport.redeliver`) saem
+   sob um `service.name` próprio (`transport`, o broker simulado) — via
+   `serviceTracer()`/`@Trace({ service })`, compartilhando o exporter da run, então
+   mesmo trace/parent, só cor/lane distinta no Jaeger/Grafana (ambos colorem por
+   service). No encerramento normal o master dá SIGTERM e espera o slave dar
+   flush (`gracefulExit` → `telemetry.shutdown()`) antes do SIGKILL, então os
+   spans de slave chegam; só o SIGKILL de _falha injetada_ é best-effort (pode
+   perder a janela do BatchSpanProcessor).
 7. Payloads IPC/mensagens são JSON puro (tipo `Json` em contracts): sem Date/Map/
    BigInt/undefined/NaN. Zod valida nas duas bordas.
 
