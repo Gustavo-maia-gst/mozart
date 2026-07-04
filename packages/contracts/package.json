@@ -9,5 +9,8 @@
   },
   "dependencies": {
     "zod": "^4.4.0"
+  },
+  "devDependencies": {
+    "yaml": "^2.9.0"
   }
 }

@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   plugins: [
     swc.vite({
-      module: { type: 'commonjs' },
+      module: { type: 'es6' },
       jsc: {
         parser: { syntax: 'typescript', decorators: true },
         transform: { legacyDecorator: true, decoratorMetadata: true },
@@ -15,7 +15,12 @@ export default defineConfig({
     }),
   ],
   test: {
-    include: ['apps/*/src/**/*.spec.ts', 'apps/*/test/**/*.spec.ts', 'packages/*/src/**/*.spec.ts'],
+    include: [
+      'apps/*/src/**/*.spec.ts',
+      'apps/*/test/**/*.spec.ts',
+      'packages/*/src/**/*.spec.ts',
+      'packages/*/test/**/*.spec.ts',
+    ],
     environment: 'node',
     testTimeout: 15_000,
     hookTimeout: 30_000,
