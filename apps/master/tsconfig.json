@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.spec.ts"],
+  "references": [
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/ipc" },
+    { "path": "../../packages/latency" },
+    { "path": "../../packages/telemetry" }
+  ]
+}

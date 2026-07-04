@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/contracts" },
+    { "path": "packages/latency" },
+    { "path": "packages/ipc" },
+    { "path": "packages/telemetry" },
+    { "path": "packages/protocols" },
+    { "path": "apps/master" },
+    { "path": "apps/slave" }
+  ]
+}

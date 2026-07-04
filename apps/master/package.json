@@ -1,0 +1,32 @@
+{
+  "name": "@mozart/master",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/main.js",
+    "start:dev": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@mozart/contracts": "workspace:*",
+    "@mozart/ipc": "workspace:*",
+    "@mozart/latency": "workspace:*",
+    "@mozart/telemetry": "workspace:*",
+    "@nestjs/common": "^11.1.0",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/core": "^11.1.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/instrumentation-pg": "^0.60.0",
+    "async-mutex": "^0.5.0",
+    "pg": "^8.22.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.0"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.1.0",
+    "@types/pg": "^8.15.0"
+  }
+}

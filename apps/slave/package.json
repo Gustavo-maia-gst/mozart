@@ -1,0 +1,23 @@
+{
+  "name": "@mozart/slave",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@mozart/contracts": "workspace:*",
+    "@mozart/ipc": "workspace:*",
+    "@mozart/protocols": "workspace:*",
+    "@mozart/telemetry": "workspace:*",
+    "@nestjs/common": "^11.1.0",
+    "@nestjs/core": "^11.1.0",
+    "@opentelemetry/api": "^1.9.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.1.0"
+  }
+}

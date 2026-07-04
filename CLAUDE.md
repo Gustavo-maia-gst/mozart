@@ -1,0 +1,60 @@
+# Mozart — Harness para Protocolos de Coordenação de DAGs Distribuídos
+
+Harness de execução para pesquisa em SD: coordenar execução tolerante a falhas de DAGs
+concorrentes. Protocolos (baseline centralizado, pull-based, push-based/dataflow) rodam
+como processos slave stateless contra um kernel (master) que simula o mundo externo.
+
+## Comandos
+
+```bash
+docker compose up -d        # jaeger (UI: localhost:16686, OTLP: 4318) + postgres (5432)
+pnpm install
+pnpm build                  # tsc -b (project references)
+pnpm test                   # vitest, unit
+pnpm test:integration      # MOZART_INTEGRATION=1 — inclui testes que precisam do postgres
+pnpm lint
+pnpm demo                   # roda scenarios/echo-smoke.yaml
+```
+
+## Arquitetura
+
+- **`apps/master`** — kernel do harness (NestJS). Dono de TODO o estado: transport
+  (filas Pub/Sub-like: at-least-once, FIFO por canal, ack + redelivery), Worker Pool W
+  simulado, Storage S (port + adapters in-memory/postgres), injetor de falhas,
+  process manager (fork/SIGKILL/restart de slaves), event log JSONL (`runs/<id>/`).
+  O master é *silencioso*: não participa do protocolo.
+- **`apps/slave`** — runner genérico de protocolo (NestJS). Stateless. Todo efeito
+  colateral (transport/W/S) atravessa IPC até o master.
+- **`packages/contracts`** — ports (TransportPort/StoragePort/WorkerPoolPort),
+  ProtocolSpi, IpcFrame, eventos, schema zod de cenário. Depende só de zod.
+- **`packages/ipc`** — RPC tipado fino sobre o canal IPC nativo do `child_process.fork`.
+- **`packages/telemetry`** — bootstrap OTel + inject/extract de trace-context em envelopes.
+- **`packages/latency`** — RNG seedado, um stream por tipo de ação, distribuições d3-random.
+- **`packages/protocols`** — implementações de ProtocolSpi (echo é o smoke test).
+
+Direção de dependência: `apps → packages`; `packages → contracts` apenas.
+
+## Invariantes (não viole)
+
+1. **Todo efeito passa pelo master.** Slave nunca toca rede/disco/banco diretamente.
+2. **Slaves são stateless.** Estado de protocolo vive no Storage S. Crash = SIGKILL,
+   restart do zero. Nunca adicione estado local significativo ao slave.
+3. **Handlers de protocolo devem ser idempotentes.** Entrega é at-least-once;
+   `onMessage` resolver ⇒ ack; rejeitar/morrer ⇒ redelivery.
+4. **Trace-context sempre explícito no envelope** (`traceCtx`). Nunca confie em
+   `context.active()` sobreviver a residência em fila/timer.
+5. **Canais/redeliveries são chaveados por `nodeId`**, nunca por handle de processo
+   (restart re-anexa).
+6. **Spans do master + event log são a fonte de verdade**; spans de slave são
+   best-effort (SIGKILL pode perder a janela do BatchSpanProcessor).
+7. Payloads IPC/mensagens são JSON puro (tipo `Json` em contracts): sem Date/Map/
+   BigInt/undefined/NaN. Zod valida nas duas bordas.
+
+## Convenções
+
+- TypeScript estrito, sem `any` não-justificado. CJS (sem `"type": "module"`);
+  deps ESM-only (d3-random) funcionam via require(esm) do Node ≥22.12.
+- Testes: vitest, specs ao lado do código (`*.spec.ts`); integração PG atrás de
+  `MOZART_INTEGRATION=1`; fake timers via tokens `Clock`/`Scheduler` injetados.
+- Cenários YAML em `scenarios/` = *o que rodar* (nós, DAG, latências, faults, seed);
+  env via `@nestjs/config` = *onde as coisas estão* (OTLP, PG URL, entrypoint slave).
