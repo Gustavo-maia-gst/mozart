@@ -10,18 +10,18 @@ import { TransportService } from './transport.service';
 class VirtualTime implements Clock, Scheduler {
   private t = 0;
   private timers: { at: number; handle: symbol; fn: () => void }[] = [];
-  now(): number {
+  public now(): number {
     return this.t;
   }
-  after(ms: number, fn: () => void): CancelHandle {
+  public after(ms: number, fn: () => void): CancelHandle {
     const handle = Symbol('t');
     this.timers.push({ at: this.t + ms, handle, fn });
     return handle;
   }
-  cancel(handle: CancelHandle): void {
+  public cancel(handle: CancelHandle): void {
     this.timers = this.timers.filter((x) => x.handle !== handle);
   }
-  advance(ms: number): void {
+  public advance(ms: number): void {
     const target = this.t + ms;
     for (;;) {
       const due = this.timers.filter((x) => x.at <= target).sort((a, b) => a.at - b.at)[0];
@@ -37,7 +37,7 @@ class VirtualTime implements Clock, Scheduler {
 class FakeSink implements DeliverySink {
   readonly delivered: { to: NodeId; delivery: Delivery }[] = [];
   reachable = true;
-  deliver(to: NodeId, delivery: Delivery): boolean {
+  public deliver(to: NodeId, delivery: Delivery): boolean {
     if (!this.reachable) return false;
     this.delivered.push({ to, delivery });
     return true;
@@ -46,11 +46,11 @@ class FakeSink implements DeliverySink {
 
 class FakeEventLog {
   readonly events: EventInput[] = [];
-  record(e: EventInput): unknown {
+  public record(e: EventInput): unknown {
     this.events.push(e);
     return e;
   }
-  ofType(type: string): EventInput[] {
+  public ofType(type: string): EventInput[] {
     return this.events.filter((e) => e.type === type);
   }
 }

@@ -52,41 +52,44 @@ function stampScope(span: Span): void {
 /** Wraps a method so each call runs inside an active span. */
 function wrap(original: AnyFn, spanName: string, kind?: SpanKind): AnyFn {
   return function (this: unknown, ...args: unknown[]): unknown {
-    return trace
-      .getTracer(TRACER_NAME)
-      .startActiveSpan(spanName, { kind: kind ?? SpanKind.INTERNAL }, (span) => {
-        stampScope(span);
-        try {
-          const result = original.apply(this, args);
-          if (result instanceof Promise) {
-            return result.then(
-              (value) => {
-                span.setStatus({ code: SpanStatusCode.OK });
-                span.end();
-                return value;
-              },
-              (err: unknown) => {
-                span.recordException(err as Error);
-                span.setStatus({ code: SpanStatusCode.ERROR, message: message(err) });
-                span.end();
-                throw err;
-              },
-            );
-          }
-          span.setStatus({ code: SpanStatusCode.OK });
-          span.end();
-          return result;
-        } catch (err) {
-          span.recordException(err as Error);
-          span.setStatus({ code: SpanStatusCode.ERROR, message: message(err) });
-          span.end();
-          throw err;
+    return trace.getTracer(TRACER_NAME).startActiveSpan(spanName, { kind: kind ?? SpanKind.INTERNAL }, (span) => {
+      stampScope(span);
+      try {
+        const result = original.apply(this, args);
+        if (result instanceof Promise) {
+          return result.then(
+            (value) => {
+              span.setStatus({ code: SpanStatusCode.OK });
+              span.end();
+              return value;
+            },
+            (err: unknown) => {
+              span.recordException(err as Error);
+              span.setStatus({ code: SpanStatusCode.ERROR, message: message(err) });
+              span.end();
+              throw err;
+            },
+          );
         }
-      });
+        span.setStatus({ code: SpanStatusCode.OK });
+        span.end();
+        return result;
+      } catch (err) {
+        span.recordException(err as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: message(err) });
+        span.end();
+        throw err;
+      }
+    });
   };
 }
 
-function decorateMethod(target: object, key: string | symbol, descriptor: PropertyDescriptor, opts: TraceOptions): void {
+function decorateMethod(
+  target: object,
+  key: string | symbol,
+  descriptor: PropertyDescriptor,
+  opts: TraceOptions,
+): void {
   if (typeof descriptor.value !== 'function') return;
   const className = (target as { constructor: { name: string } }).constructor.name;
   const spanName = opts.name ?? `${className}.${String(key)}`;

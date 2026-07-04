@@ -1,5 +1,4 @@
 import type { Scenario } from '@mozart/contracts';
-import { annotateSpan, ATTR, Trace } from '@mozart/telemetry';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
@@ -36,7 +35,7 @@ export class RunService {
     private readonly faults: FaultInjectorService,
   ) {}
 
-  async run(opts: RunOptions = {}): Promise<RunSummary> {
+  public async run(opts: RunOptions = {}): Promise<RunSummary> {
     this.events.open();
     this.events.record({ type: 'run.started', data: { scenario: this.scenario.name } });
     this.logger.log(`run ${this.runId} — scenario "${this.scenario.name}"`);
@@ -54,9 +53,7 @@ export class RunService {
     return summary;
   }
 
-  @Trace({ name: 'run' })
   private async execute(): Promise<void> {
-    annotateSpan({ [ATTR.runId]: this.runId });
     this.pm.spawnAll();
     await this.pm.awaitAllReady(READY_TIMEOUT_MS);
     this.logger.log('all nodes ready — activating protocol');

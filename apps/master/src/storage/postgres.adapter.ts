@@ -19,7 +19,7 @@ export class PostgresStorageAdapter implements StorageAdapter {
     this.pool = new Pool({ connectionString, max });
   }
 
-  async init(): Promise<void> {
+  public async init(): Promise<void> {
     await this.pool.query(
       `create table if not exists task_state (
          task_id text primary key,
@@ -29,16 +29,16 @@ export class PostgresStorageAdapter implements StorageAdapter {
     );
   }
 
-  async dispose(): Promise<void> {
+  public async dispose(): Promise<void> {
     await this.pool.end();
   }
 
-  async read(taskId: TaskId): Promise<TaskState | null> {
+  public async read(taskId: TaskId): Promise<TaskState | null> {
     const r = await this.pool.query<{ data: TaskState }>('select data from task_state where task_id = $1', [taskId]);
     return r.rows[0]?.data ?? null;
   }
 
-  async find(query: StorageQuery): Promise<TaskMatch[]> {
+  public async find(query: StorageQuery): Promise<TaskMatch[]> {
     // jsonb containment (@>) is attribute-equality for the given keys and can
     // use a GIN index on data; an empty query contains everything.
     const r = await this.pool.query<{ task_id: TaskId; data: TaskState }>(
@@ -48,11 +48,11 @@ export class PostgresStorageAdapter implements StorageAdapter {
     return r.rows.map((row) => ({ taskId: row.task_id, data: row.data }));
   }
 
-  async save(taskId: TaskId, data: TaskState): Promise<void> {
+  public async save(taskId: TaskId, data: TaskState): Promise<void> {
     await this.pool.query(UPSERT, [taskId, data]);
   }
 
-  async acquire(taskId: TaskId, signal: AbortSignal): Promise<AdapterLease> {
+  public async acquire(taskId: TaskId, signal: AbortSignal): Promise<AdapterLease> {
     const client = await this.pool.connect();
     const pid = (await client.query<{ pid: number }>('select pg_backend_pid() as pid')).rows[0]!.pid;
     const onAbort = (): void => {

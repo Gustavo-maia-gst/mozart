@@ -25,7 +25,7 @@ export class IpcHostService {
     private readonly worker: WorkerPoolService,
   ) {}
 
-  buildHandlers(): RpcHandlers {
+  public buildHandlers(): RpcHandlers {
     return {
       'node.ready': (nodeId) => {
         this.onNodeReady?.(nodeId);

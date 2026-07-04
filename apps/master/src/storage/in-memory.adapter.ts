@@ -7,11 +7,11 @@ export class InMemoryStorageAdapter implements StorageAdapter {
   private readonly store = new Map<TaskId, TaskState>();
   private readonly mutexes = new Map<TaskId, Mutex>();
 
-  read(taskId: TaskId): Promise<TaskState | null> {
+  public read(taskId: TaskId): Promise<TaskState | null> {
     return Promise.resolve(this.clone(this.store.get(taskId)));
   }
 
-  find(query: StorageQuery): Promise<TaskMatch[]> {
+  public find(query: StorageQuery): Promise<TaskMatch[]> {
     const matches: TaskMatch[] = [];
     for (const [taskId, data] of this.store) {
       if (matchesQuery(data, query)) matches.push({ taskId, data: this.clone(data)! });
@@ -19,12 +19,12 @@ export class InMemoryStorageAdapter implements StorageAdapter {
     return Promise.resolve(matches);
   }
 
-  save(taskId: TaskId, data: TaskState): Promise<void> {
+  public save(taskId: TaskId, data: TaskState): Promise<void> {
     this.store.set(taskId, this.clone(data)!);
     return Promise.resolve();
   }
 
-  async acquire(taskId: TaskId, signal: AbortSignal): Promise<AdapterLease> {
+  public async acquire(taskId: TaskId, signal: AbortSignal): Promise<AdapterLease> {
     const mutex = this.mutexFor(taskId);
     const releaser = await this.acquireAbortable(mutex, signal);
     let released = false;

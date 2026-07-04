@@ -23,7 +23,7 @@ export class LatencyModel {
   ) {}
 
   /** Returns a non-negative latency in ms for the given action type. */
-  sample(actionType: string): number {
+  public sample(actionType: string): number {
     return this.samplerFor(actionType)();
   }
 

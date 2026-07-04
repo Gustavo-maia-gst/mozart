@@ -23,7 +23,7 @@ export class NetworkState {
   readonly inboundBlocked = new Set<NodeId>();
   readonly outboundBlocked = new Set<NodeId>();
 
-  blocks(from: NodeId, to: NodeId): boolean {
+  public blocks(from: NodeId, to: NodeId): boolean {
     return this.outboundBlocked.has(from) || this.inboundBlocked.has(to);
   }
 }

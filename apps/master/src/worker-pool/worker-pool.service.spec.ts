@@ -9,18 +9,18 @@ import { WorkerPoolService } from './worker-pool.service';
 class VirtualTime implements Clock, Scheduler {
   private t = 0;
   private timers: { at: number; handle: symbol; fn: () => void }[] = [];
-  now(): number {
+  public now(): number {
     return this.t;
   }
-  after(ms: number, fn: () => void): CancelHandle {
+  public after(ms: number, fn: () => void): CancelHandle {
     const handle = Symbol('t');
     this.timers.push({ at: this.t + ms, handle, fn });
     return handle;
   }
-  cancel(handle: CancelHandle): void {
+  public cancel(handle: CancelHandle): void {
     this.timers = this.timers.filter((x) => x.handle !== handle);
   }
-  advance(ms: number): void {
+  public advance(ms: number): void {
     const target = this.t + ms;
     for (;;) {
       const due = this.timers.filter((x) => x.at <= target).sort((a, b) => a.at - b.at)[0];
@@ -35,7 +35,7 @@ class VirtualTime implements Clock, Scheduler {
 
 class FakeTransport {
   readonly published: { from: NodeId; to: NodeId; topic: string; body: Json }[] = [];
-  publish(from: NodeId, to: NodeId, topic: string, body: Json): string {
+  public publish(from: NodeId, to: NodeId, topic: string, body: Json): string {
     this.published.push({ from, to, topic, body });
     return 'm';
   }
@@ -43,11 +43,11 @@ class FakeTransport {
 
 class FakeEventLog {
   readonly events: EventInput[] = [];
-  record(e: EventInput): unknown {
+  public record(e: EventInput): unknown {
     this.events.push(e);
     return e;
   }
-  ofType(type: string): EventInput[] {
+  public ofType(type: string): EventInput[] {
     return this.events.filter((e) => e.type === type);
   }
 }

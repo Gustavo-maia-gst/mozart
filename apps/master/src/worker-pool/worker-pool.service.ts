@@ -1,12 +1,14 @@
 import { type NodeId, type Scenario, type TaskId, WORKER_NODE_ID, WORKER_TOPICS } from '@mozart/contracts';
 import type { LatencyModel } from '@mozart/latency';
-import { annotateSpan, ATTR, injectActiveContext, runWithExtractedContext, Trace } from '@mozart/telemetry';
+import { ATTR, TRACER_NAME } from '@mozart/telemetry';
 import { Inject, Injectable } from '@nestjs/common';
+import { context, type Span, SpanStatusCode, trace } from '@opentelemetry/api';
 import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
 import { LATENCY_MODEL, SCENARIO, SCHEDULER } from '../tokens';
 import { TransportService } from '../transport/transport.service';
 
+const tracer = trace.getTracer(TRACER_NAME);
 const TASK_DURATION = 'worker.taskDuration';
 
 /**
@@ -19,6 +21,8 @@ export class WorkerPoolService {
   private readonly running = new Set<TaskId>();
   private readonly failNext = new Set<TaskId>();
   private readonly costs = new Map<TaskId, number | undefined>();
+  /** One live span per running task: opened on start, ended on complete/fail. */
+  private readonly spans = new Map<TaskId, Span>();
 
   constructor(
     @Inject(SCHEDULER) private readonly scheduler: Scheduler,
@@ -31,11 +35,11 @@ export class WorkerPoolService {
   }
 
   /** Marks `taskId`'s next execution to fail (one-shot). */
-  failTask(taskId: TaskId): void {
+  public failTask(taskId: TaskId): void {
     this.failNext.add(taskId);
   }
 
-  start(nodeId: NodeId, taskId: TaskId): void {
+  public start(nodeId: NodeId, taskId: TaskId): void {
     if (this.running.has(taskId)) {
       this.events.record({ type: 'worker.duplicate-start', nodeId, taskId });
       return;
@@ -43,30 +47,37 @@ export class WorkerPoolService {
     this.running.add(taskId);
     this.events.record({ type: 'worker.started', nodeId, taskId });
 
-    // Capture the caller's context so the eventual completion links back to it.
-    const startCtx: Record<string, string> = {};
-    injectActiveContext(startCtx);
-    this.scheduler.after(this.durationFor(taskId), () => this.complete(nodeId, taskId, startCtx));
+    // Open a span spanning the whole execution — child of the caller's active
+    // context (the coordinator's worker.start), held across the simulated
+    // duration and ended on complete/fail below.
+    const span = tracer.startSpan('worker.execute', {
+      attributes: { [ATTR.taskId]: taskId, [ATTR.nodeId]: nodeId },
+    });
+    this.spans.set(taskId, span);
+    this.scheduler.after(this.durationFor(taskId), () => this.complete(nodeId, taskId));
   }
 
-  private complete(nodeId: NodeId, taskId: TaskId, startCtx: Record<string, string>): void {
+  private complete(nodeId: NodeId, taskId: TaskId): void {
     this.running.delete(taskId);
     const failed = this.failNext.delete(taskId);
-    // The execute span descends from the caller's start context so the
-    // completion event links back to the coordinator that started the task.
-    runWithExtractedContext(startCtx, () => this.execute(nodeId, taskId, failed));
-  }
+    const span = this.spans.get(taskId);
+    this.spans.delete(taskId);
 
-  @Trace({ name: 'worker.execute' })
-  private execute(nodeId: NodeId, taskId: TaskId, failed: boolean): void {
-    annotateSpan({ [ATTR.taskId]: taskId, [ATTR.nodeId]: nodeId });
-    const topic = failed ? WORKER_TOPICS.failed : WORKER_TOPICS.completed;
-    this.transport.publish(WORKER_NODE_ID, nodeId, topic, { taskId });
-    this.events.record({
-      type: failed ? 'worker.failed' : 'worker.completed',
-      nodeId,
-      taskId,
-    });
+    // Publish the completion under the execute span so the coordinator's
+    // onMessage nests beneath it (one tree across the deliver hop).
+    const publish = (): void => {
+      const topic = failed ? WORKER_TOPICS.failed : WORKER_TOPICS.completed;
+      this.transport.publish(WORKER_NODE_ID, nodeId, topic, { taskId });
+      this.events.record({ type: failed ? 'worker.failed' : 'worker.completed', nodeId, taskId });
+    };
+
+    if (!span) {
+      publish();
+      return;
+    }
+    span.setStatus({ code: failed ? SpanStatusCode.ERROR : SpanStatusCode.OK });
+    context.with(trace.setSpan(context.active(), span), publish);
+    span.end();
   }
 
   private durationFor(taskId: TaskId): number {

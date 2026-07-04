@@ -6,8 +6,8 @@ import type { JsonObject } from './json';
  * without `@Inject`).
  */
 export abstract class ProtocolLogger {
-  abstract debug(message: string, attrs?: JsonObject): void;
-  abstract info(message: string, attrs?: JsonObject): void;
-  abstract warn(message: string, attrs?: JsonObject): void;
-  abstract error(message: string, attrs?: JsonObject): void;
+  public abstract debug(message: string, attrs?: JsonObject): void;
+  public abstract info(message: string, attrs?: JsonObject): void;
+  public abstract warn(message: string, attrs?: JsonObject): void;
+  public abstract error(message: string, attrs?: JsonObject): void;
 }

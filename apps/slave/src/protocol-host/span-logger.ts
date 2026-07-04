@@ -12,16 +12,16 @@ export class SpanLogger implements ProtocolLogger {
     this.logger = new Logger(`protocol:${nodeId}`);
   }
 
-  debug(message: string, attrs?: JsonObject): void {
+  public debug(message: string, attrs?: JsonObject): void {
     this.emit('debug', message, attrs);
   }
-  info(message: string, attrs?: JsonObject): void {
+  public info(message: string, attrs?: JsonObject): void {
     this.emit('log', message, attrs);
   }
-  warn(message: string, attrs?: JsonObject): void {
+  public warn(message: string, attrs?: JsonObject): void {
     this.emit('warn', message, attrs);
   }
-  error(message: string, attrs?: JsonObject): void {
+  public error(message: string, attrs?: JsonObject): void {
     this.emit('error', message, attrs);
   }
 

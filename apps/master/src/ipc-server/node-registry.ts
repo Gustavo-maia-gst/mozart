@@ -14,23 +14,23 @@ export class NodeRegistry implements DeliverySink {
   private readonly logger = new Logger(NodeRegistry.name);
   private readonly links = new Map<NodeId, NodeLink>();
 
-  register(link: NodeLink): void {
+  public register(link: NodeLink): void {
     this.links.set(link.nodeId, link);
   }
 
-  unregister(nodeId: NodeId): void {
+  public unregister(nodeId: NodeId): void {
     this.links.delete(nodeId);
   }
 
-  get(nodeId: NodeId): NodeLink | undefined {
+  public get(nodeId: NodeId): NodeLink | undefined {
     return this.links.get(nodeId);
   }
 
-  liveNodeIds(): NodeId[] {
+  public liveNodeIds(): NodeId[] {
     return [...this.links.keys()];
   }
 
-  deliver(to: NodeId, delivery: Delivery): boolean {
+  public deliver(to: NodeId, delivery: Delivery): boolean {
     const link = this.links.get(to);
     if (!link?.alive) return false; // crashed/absent — transport will retry
     const sent = link.push('delivery', delivery);

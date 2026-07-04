@@ -18,22 +18,22 @@ export class StorageGate {
   private readonly nodeOutage = new Set<NodeId>();
   private waiters: Waiter[] = [];
 
-  affected(nodeId: NodeId): boolean {
+  public affected(nodeId: NodeId): boolean {
     return this.globalOutage || this.nodeOutage.has(nodeId);
   }
 
   /** Resolves immediately if S is available to `nodeId`, else when it recovers. */
-  pass(nodeId: NodeId): Promise<void> {
+  public pass(nodeId: NodeId): Promise<void> {
     if (!this.affected(nodeId)) return Promise.resolve();
     return new Promise<void>((resolve) => this.waiters.push({ nodeId, resolve }));
   }
 
-  begin(scope: 'all' | NodeId): void {
+  public begin(scope: 'all' | NodeId): void {
     if (scope === 'all') this.globalOutage = true;
     else this.nodeOutage.add(scope);
   }
 
-  end(scope: 'all' | NodeId): void {
+  public end(scope: 'all' | NodeId): void {
     if (scope === 'all') this.globalOutage = false;
     else this.nodeOutage.delete(scope);
     this.releaseUnblocked();

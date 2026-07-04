@@ -1,11 +1,13 @@
 import {
-  type Delivery,
   type Graph,
   type GraphId,
+  type Message,
   ProtocolLogger,
   StoragePort,
   TransportPort,
+  type WorkerFailEvent,
   WorkerPoolPort,
+  type WorkerSuccessEvent,
 } from '@mozart/contracts';
 import { Injectable } from '@nestjs/common';
 
@@ -18,12 +20,16 @@ import { Injectable } from '@nestjs/common';
  * constructor and no `@Inject` (the ports are abstract classes, used as DI
  * tokens by type).
  *
- * A protocol defines three operations:
+ * Setup:
  *  - `persistGraph` — how a graph is stored in S before it runs (setup only);
- *  - `startGraph`   — begin executing an already-persisted graph;
- *  - `onMessage`    — handle every inbound message (worker events + coordination).
+ *  - `startGraph`   — begin executing an already-persisted graph.
  *
- * Ack contract: a resolved `onMessage` acks; a rejection triggers redelivery, so
+ * Inbound events — the host routes each delivery by topic to exactly one of:
+ *  - `onWorkerSuccess` — a task dispatched to the Worker Pool completed;
+ *  - `onWorkerFail`    — a task dispatched to the Worker Pool failed;
+ *  - `onMessage`       — a coordinator<->coordinator message (any other topic).
+ *
+ * Ack contract: a resolved handler acks; a rejection triggers redelivery, so
  * handlers must be idempotent.
  */
 @Injectable()
@@ -31,12 +37,22 @@ export abstract class Protocol {
   constructor(
     protected readonly transport: TransportPort,
     protected readonly storage: StoragePort,
-    protected readonly workers: WorkerPoolPort,
+    protected readonly workerPool: WorkerPoolPort,
     protected readonly log: ProtocolLogger,
   ) {}
 
   abstract readonly name: string;
-  abstract persistGraph(graph: Graph): Promise<void>;
-  abstract startGraph(graphId: GraphId): Promise<void>;
-  abstract onMessage(message: Delivery): Promise<void>;
+
+  public abstract persistGraph(graph: Graph): Promise<void>;
+
+  public abstract startGraph(graphId: GraphId): Promise<void>;
+
+  /** A task previously dispatched to the Worker Pool completed successfully. */
+  public abstract onWorkerSuccess(event: WorkerSuccessEvent): Promise<void>;
+
+  /** A task dispatched to the Worker Pool failed. */
+  public abstract onWorkerFail(event: WorkerFailEvent): Promise<void>;
+
+  /** A coordinator<->coordinator message (any non-worker topic). */
+  public abstract onMessage(event: Message): Promise<void>;
 }

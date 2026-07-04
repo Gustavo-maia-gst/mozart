@@ -12,7 +12,7 @@ const pgUrl = process.env.MOZART_PG_URL ?? 'postgres://mozart:mozart@localhost:5
 
 class FakeEventLog {
   readonly events: EventInput[] = [];
-  record(e: EventInput): unknown {
+  public record(e: EventInput): unknown {
     this.events.push(e);
     return e;
   }

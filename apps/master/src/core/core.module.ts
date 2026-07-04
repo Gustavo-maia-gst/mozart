@@ -18,7 +18,7 @@ export interface CoreParams {
 @Global()
 @Module({})
 export class CoreModule {
-  static forRun(params: CoreParams): DynamicModule {
+  public static forRun(params: CoreParams): DynamicModule {
     return {
       module: CoreModule,
       imports: [ClockModule],

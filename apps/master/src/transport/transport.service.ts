@@ -37,7 +37,7 @@ export class TransportService {
   }
 
   /** Enqueue a message; captures the active trace context for propagation. */
-  publish(from: NodeId, to: NodeId, topic: string, body: Json): string {
+  public publish(from: NodeId, to: NodeId, topic: string, body: Json): string {
     const messageId = randomUUID();
     const publishTraceCtx: Record<string, string> = {};
     injectActiveContext(publishTraceCtx);
@@ -65,7 +65,7 @@ export class TransportService {
   }
 
   /** Acknowledge a delivery. Unknown/stale ids are ignored (idempotent). */
-  ack(deliveryId: string): void {
+  public ack(deliveryId: string): void {
     const ch = this.outstanding.get(deliveryId);
     if (!ch || ch.outstanding?.deliveryId !== deliveryId) return;
 
@@ -85,12 +85,12 @@ export class TransportService {
   // --- fault hooks (invoked by the fault injector) ---------------------------
 
   /** Emit `extraCopies` duplicate deliveries on the channel's next delivery. */
-  scheduleDuplicates(from: NodeId, to: NodeId, extraCopies: number): void {
+  public scheduleDuplicates(from: NodeId, to: NodeId, extraCopies: number): void {
     this.channelFor(from, to).duplicateBudget += extraCopies;
   }
 
   /** Resume channels whose endpoints just became un-partitioned. */
-  resumeAll(): void {
+  public resumeAll(): void {
     for (const ch of this.channels.values()) this.pump(ch);
   }
 
@@ -132,9 +132,13 @@ export class TransportService {
     head.attempts += 1;
     const deliveryId = randomUUID();
 
-    // Deliver span descends from the publish context; the delivery carries the
-    // deliver-span context so the slave's onMessage becomes its child.
-    runWithExtractedContext(head.publishTraceCtx, () => this.emitDelivery(ch, head, deliveryId, redelivery));
+    // Delivery descends from the publish context so the slave's onMessage nests
+    // under the sender's publish span — one tree, no harness span for the first
+    // delivery (it's inferable from onMessage starting). A redelivery, however,
+    // opens its own span: it's the interesting fault-behaviour metric.
+    runWithExtractedContext(head.publishTraceCtx, () =>
+      redelivery ? this.emitRedelivery(ch, head, deliveryId) : this.emitDelivery(ch, head, deliveryId, false),
+    );
 
     // Track outstanding + arm the visibility timer regardless of reachability:
     // if the node is down the timer simply retries later.
@@ -145,16 +149,20 @@ export class TransportService {
     this.outstanding.set(deliveryId, ch);
   }
 
-  @Trace({ name: 'transport.deliver', kind: SpanKind.PRODUCER })
-  private emitDelivery(ch: Channel, head: QueuedMessage, deliveryId: string, redelivery: boolean): void {
+  @Trace({ name: 'transport.redeliver', kind: SpanKind.PRODUCER })
+  private emitRedelivery(ch: Channel, head: QueuedMessage, deliveryId: string): void {
     annotateSpan({
       [ATTR.channel]: ch.key,
       [ATTR.messageId]: head.messageId,
       [ATTR.topic]: head.topic,
       [ATTR.attempt]: head.attempts,
     });
-    // buildDelivery captures this active span, so the slave's onMessage nests
-    // under it — one trace tree per message across the deliver/redeliver hops.
+    this.emitDelivery(ch, head, deliveryId, true);
+  }
+
+  private emitDelivery(ch: Channel, head: QueuedMessage, deliveryId: string, redelivery: boolean): void {
+    // buildDelivery captures the active context (the redeliver span, or the
+    // sender's publish span on a first delivery) as the delivery's parent.
     const delivery = this.buildDelivery(head, deliveryId);
     this.events.record({
       type: redelivery ? 'transport.redelivered' : 'transport.delivered',

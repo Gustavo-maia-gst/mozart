@@ -31,7 +31,7 @@ export class FaultInjectorService {
   ) {}
 
   /** Schedule all declared faults relative to now (call once, at run start). */
-  arm(): void {
+  public arm(): void {
     for (const fault of this.scenario.faults) {
       if ('at' in fault) this.scheduler.after(fault.at, () => this.apply(fault));
       else this.apply(fault); // failTask has no schedule — arm immediately
@@ -49,7 +49,7 @@ export class FaultInjectorService {
     (dispatch[fault.action] as (f: FaultSpec) => void)(fault);
   }
 
-  killNode(nodeId: NodeId, restartAfterMs?: number): void {
+  public killNode(nodeId: NodeId, restartAfterMs?: number): void {
     this.record('killNode', { nodeId, restartAfterMs: restartAfterMs ?? null });
     this.pm.kill(nodeId);
     if (restartAfterMs !== undefined) {
@@ -57,7 +57,7 @@ export class FaultInjectorService {
     }
   }
 
-  storageOutage(scope: 'all' | NodeId, durationMs: number): void {
+  public storageOutage(scope: 'all' | NodeId, durationMs: number): void {
     this.record('storageOutage', { scope, durationMs });
     this.gate.begin(scope);
     this.events.record({ type: 'storage.outage.begin', data: { scope } });
@@ -67,7 +67,7 @@ export class FaultInjectorService {
     });
   }
 
-  partitionNode(nodeId: NodeId, durationMs: number, direction: 'in' | 'out' | 'both'): void {
+  public partitionNode(nodeId: NodeId, durationMs: number, direction: 'in' | 'out' | 'both'): void {
     this.record('partitionNode', { nodeId, durationMs, direction });
     if (direction === 'in' || direction === 'both') this.network.inboundBlocked.add(nodeId);
     if (direction === 'out' || direction === 'both') this.network.outboundBlocked.add(nodeId);
@@ -78,12 +78,12 @@ export class FaultInjectorService {
     });
   }
 
-  duplicateDeliveries(from: NodeId, to: NodeId, extraCopies: number): void {
+  public duplicateDeliveries(from: NodeId, to: NodeId, extraCopies: number): void {
     this.record('duplicateDeliveries', { from, to, extraCopies });
     this.transport.scheduleDuplicates(from, to, extraCopies);
   }
 
-  failTask(taskId: TaskId): void {
+  public failTask(taskId: TaskId): void {
     this.record('failTask', { taskId });
     this.worker.failTask(taskId);
   }

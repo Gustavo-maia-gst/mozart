@@ -26,7 +26,7 @@ import { IPC_CLIENT } from '../tokens';
 export class TransportClient implements TransportPort {
   constructor(@Inject(IPC_CLIENT) private readonly ipc: IpcClient) {}
 
-  async publish(to: NodeId, topic: string, body: Json): Promise<void> {
+  public async publish(to: NodeId, topic: string, body: Json): Promise<void> {
     annotateSpan({ [ATTR.topic]: topic });
     await this.ipc.call('transport.publish', { to, topic, body });
   }
@@ -37,7 +37,7 @@ export class TransportClient implements TransportPort {
 export class WorkerPoolClient implements WorkerPoolPort {
   constructor(@Inject(IPC_CLIENT) private readonly ipc: IpcClient) {}
 
-  async start(taskId: TaskId): Promise<void> {
+  public async start(taskId: TaskId): Promise<void> {
     annotateSpan({ [ATTR.taskId]: taskId });
     await this.ipc.call('worker.start', { taskId });
   }
@@ -48,21 +48,21 @@ export class WorkerPoolClient implements WorkerPoolPort {
 export class StorageClient implements StoragePort {
   constructor(@Inject(IPC_CLIENT) private readonly ipc: IpcClient) {}
 
-  async read(taskId: TaskId): Promise<TaskState | null> {
+  public async read(taskId: TaskId): Promise<TaskState | null> {
     const { data } = await this.ipc.call('storage.read', { taskId });
     return data;
   }
 
-  async find(query: StorageQuery): Promise<TaskMatch[]> {
+  public async find(query: StorageQuery): Promise<TaskMatch[]> {
     const { matches } = await this.ipc.call('storage.find', { query });
     return matches;
   }
 
-  async save(taskId: TaskId, data: TaskState): Promise<void> {
+  public async save(taskId: TaskId, data: TaskState): Promise<void> {
     await this.ipc.call('storage.save', { taskId, data });
   }
 
-  async readExclusive(taskId: TaskId): Promise<ExclusiveRead> {
+  public async readExclusive(taskId: TaskId): Promise<ExclusiveRead> {
     const r = await this.ipc.call('storage.readExclusive', { taskId });
     return new RemoteExclusiveRead(this.ipc, r.leaseId, r.data);
   }
@@ -77,11 +77,11 @@ class RemoteExclusiveRead implements ExclusiveRead {
     readonly data: TaskState | null,
   ) {}
 
-  async save(data: TaskState): Promise<void> {
+  public async save(data: TaskState): Promise<void> {
     await this.ipc.call('storage.lease.save', { leaseId: this.leaseId, data });
   }
 
-  async release(): Promise<void> {
+  public async release(): Promise<void> {
     await this.ipc.call('storage.lease.release', { leaseId: this.leaseId });
   }
 }

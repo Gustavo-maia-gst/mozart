@@ -1,13 +1,14 @@
 import {
-  type Delivery,
   type Graph,
   type GraphId,
   type JsonObject,
+  type Message,
   type TaskId,
-  WORKER_TOPICS,
+  type WorkerFailEvent,
+  type WorkerSuccessEvent,
 } from '@mozart/contracts';
 import { Injectable } from '@nestjs/common';
-import { Protocol } from './protocol';
+import { Protocol } from '../../protocol';
 
 /** In-memory bookkeeping for one graph's execution. */
 interface GraphRuntime {
@@ -35,12 +36,12 @@ export class BaselineProtocol extends Protocol {
   private readonly taskGraph = new Map<TaskId, GraphId>();
 
   /** Baseline's persistence layout: the entire graph under one key. */
-  async persistGraph(graph: Graph): Promise<void> {
+  public async persistGraph(graph: Graph): Promise<void> {
     await this.storage.save(this.key(graph.id), { graph } as unknown as JsonObject);
     this.log.info('graph persisted', { graphId: graph.id, tasks: graph.tasks.length });
   }
 
-  async startGraph(graphId: GraphId): Promise<void> {
+  public async startGraph(graphId: GraphId): Promise<void> {
     const stored = (await this.storage.read(this.key(graphId))) as { graph?: Graph } | null;
     const graph = stored?.graph;
     if (!graph) throw new Error(`graph ${graphId} is not persisted`);
@@ -52,19 +53,24 @@ export class BaselineProtocol extends Protocol {
     }
   }
 
-  /** Idempotent under at-least-once: a duplicated completion is a no-op. */
-  async onMessage(message: Delivery): Promise<void> {
-    const taskId = (message.body as { taskId?: TaskId }).taskId;
-    if (!taskId) return;
-    if (message.topic === WORKER_TOPICS.failed) {
-      this.log.warn('task failed', { taskId });
-      return;
-    }
-    if (message.topic !== WORKER_TOPICS.completed) return;
+  /**
+   * Advance the DAG on a task completion. Idempotent under at-least-once: a
+   * duplicated completion (or one for an unknown task) is a no-op.
+   */
+  public async onWorkerSuccess(event: WorkerSuccessEvent): Promise<void> {
+    const runtime = this.runtimeOf(event.taskId);
+    if (!runtime || runtime.done.has(event.taskId)) return; // unknown / duplicate → ack, no-op
+    await this.completeTask(runtime, event.taskId);
+  }
 
-    const runtime = this.runtimeOf(taskId);
-    if (!runtime || runtime.done.has(taskId)) return; // unknown / duplicate → ack, no-op
-    await this.completeTask(runtime, taskId);
+  /** No fault tolerance by design: log the failure and let the graph stall. */
+  public async onWorkerFail(event: WorkerFailEvent): Promise<void> {
+    this.log.warn('task failed', { taskId: event.taskId });
+  }
+
+  /** A single coordinator never exchanges coordination messages. */
+  public async onMessage(event: Message): Promise<void> {
+    this.log.warn('unexpected coordinator message', { topic: event.topic, from: event.from });
   }
 
   private async completeTask(runtime: GraphRuntime, taskId: TaskId): Promise<void> {
@@ -97,7 +103,7 @@ export class BaselineProtocol extends Protocol {
 
   private async startTask(taskId: TaskId): Promise<void> {
     this.log.info('start task', { taskId });
-    await this.workers.start(taskId);
+    await this.workerPool.start(taskId);
   }
 
   private runtimeOf(taskId: TaskId): GraphRuntime | undefined {

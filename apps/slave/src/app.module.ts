@@ -10,7 +10,7 @@ export interface SlaveParams {
 
 @Module({})
 export class SlaveModule {
-  static forNode(params: SlaveParams): DynamicModule {
+  public static forNode(params: SlaveParams): DynamicModule {
     return {
       module: SlaveModule,
       global: true, // NODE_ID/PROTOCOL_NAME/RUN_ID visible to ProtocolHostModule

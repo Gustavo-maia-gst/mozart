@@ -1,5 +1,5 @@
 import type { Type } from '@nestjs/common';
-import { BaselineProtocol } from './baseline';
+import { BaselineProtocol } from './implementations/baseline/baseline';
 import type { Protocol } from './protocol';
 
 /** Name -> protocol class. Slaves resolve their protocol by MOZART_PROTOCOL. */

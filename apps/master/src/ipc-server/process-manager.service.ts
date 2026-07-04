@@ -45,11 +45,11 @@ export class ProcessManagerService {
     this.ipcHost.onNodeReady = (nodeId) => this.markReady(nodeId);
   }
 
-  spawnAll(): void {
+  public spawnAll(): void {
     for (const nodeId of coordinatorIds(this.scenario)) this.spawn(nodeId);
   }
 
-  spawn(nodeId: NodeId): void {
+  public spawn(nodeId: NodeId): void {
     const entrypoint = this.env.MOZART_SLAVE_ENTRYPOINT ?? join(process.cwd(), 'apps/slave/dist/main.js');
     const name = this.scenario.nodes.find((n) => n.id === nodeId)?.name ?? nodeId;
     const child = fork(entrypoint, [], {
@@ -74,7 +74,7 @@ export class ProcessManagerService {
   }
 
   /** SIGKILL a node. `injected` distinguishes fault kills from shutdown kills. */
-  kill(nodeId: NodeId, injected = true): void {
+  public kill(nodeId: NodeId, injected = true): void {
     const slave = this.slaves.get(nodeId);
     if (!slave) return;
     slave.injectedKill = injected;
@@ -82,26 +82,26 @@ export class ProcessManagerService {
     slave.child.kill('SIGKILL');
   }
 
-  restart(nodeId: NodeId): void {
+  public restart(nodeId: NodeId): void {
     this.events.record({ type: 'node.restarted', nodeId });
     this.spawn(nodeId); // fresh, stateless; link rebound under same nodeId
   }
 
-  activateAll(): void {
+  public activateAll(): void {
     for (const nodeId of this.registry.liveNodeIds()) {
       this.registry.get(nodeId)?.push('protocol.activate', {});
     }
   }
 
   /** Graceful shutdown: ask protocols to deactivate, then SIGKILL survivors. */
-  shutdown(): void {
+  public shutdown(): void {
     for (const nodeId of this.registry.liveNodeIds()) {
       this.registry.get(nodeId)?.push('protocol.deactivate', {});
     }
     for (const nodeId of [...this.slaves.keys()]) this.kill(nodeId, false);
   }
 
-  awaitAllReady(timeoutMs: number): Promise<void> {
+  public awaitAllReady(timeoutMs: number): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`nodes not ready within ${timeoutMs}ms`)), timeoutMs);
       this.readyCheck = () => {

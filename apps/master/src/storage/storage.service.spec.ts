@@ -9,11 +9,11 @@ import { StorageGate } from './storage-gate';
 
 class FakeEventLog {
   readonly events: EventInput[] = [];
-  record(e: EventInput): unknown {
+  public record(e: EventInput): unknown {
     this.events.push(e);
     return e;
   }
-  ofType(type: string): EventInput[] {
+  public ofType(type: string): EventInput[] {
     return this.events.filter((e) => e.type === type);
   }
 }

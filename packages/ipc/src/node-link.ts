@@ -34,17 +34,17 @@ export class NodeLink {
     this.channel.onMessage((frame) => this.onFrame(frame));
   }
 
-  push<T extends PushType>(type: T, payload: PushContracts[T]): boolean {
+  public push<T extends PushType>(type: T, payload: PushContracts[T]): boolean {
     const frame = newFrame({ kind: 'push', method: type, payload });
     this.hooks.injectTraceCtx(frame.traceCtx);
     return this.channel.send(frame);
   }
 
-  onClose(cb: () => void): void {
+  public onClose(cb: () => void): void {
     this.channel.onClose(cb);
   }
 
-  get alive(): boolean {
+  public get alive(): boolean {
     return this.channel.alive;
   }
 

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { NodeId, StorageQuery, TaskId, TaskMatch, TaskState } from '@mozart/contracts';
 import type { LatencyModel } from '@mozart/latency';
-import { annotateSpan, ATTR, SpanKind, Trace } from '@mozart/telemetry';
 import { Inject, Injectable } from '@nestjs/common';
 import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
@@ -38,9 +37,7 @@ export class StorageService {
     private readonly events: EventLogService,
   ) {}
 
-  @Trace({ name: 'storage.read', kind: SpanKind.SERVER })
-  async read(nodeId: NodeId, taskId: TaskId): Promise<TaskState | null> {
-    annotateSpan({ [ATTR.nodeId]: nodeId, [ATTR.taskId]: taskId });
+  public async read(nodeId: NodeId, taskId: TaskId): Promise<TaskState | null> {
     await this.gate.pass(nodeId);
     await this.sleep(this.latency.sample('storage.read'));
     const data = await this.adapter.read(taskId);
@@ -48,9 +45,7 @@ export class StorageService {
     return data;
   }
 
-  @Trace({ name: 'storage.find', kind: SpanKind.SERVER })
-  async find(nodeId: NodeId, query: StorageQuery): Promise<TaskMatch[]> {
-    annotateSpan({ [ATTR.nodeId]: nodeId });
+  public async find(nodeId: NodeId, query: StorageQuery): Promise<TaskMatch[]> {
     await this.gate.pass(nodeId);
     await this.sleep(this.latency.sample('storage.find'));
     const matches = await this.adapter.find(query);
@@ -58,18 +53,14 @@ export class StorageService {
     return matches;
   }
 
-  @Trace({ name: 'storage.save', kind: SpanKind.SERVER })
-  async save(nodeId: NodeId, taskId: TaskId, data: TaskState): Promise<void> {
-    annotateSpan({ [ATTR.nodeId]: nodeId, [ATTR.taskId]: taskId });
+  public async save(nodeId: NodeId, taskId: TaskId, data: TaskState): Promise<void> {
     await this.gate.pass(nodeId);
     await this.sleep(this.latency.sample('storage.save'));
     await this.adapter.save(taskId, data);
     this.events.record({ type: 'storage.save', nodeId, taskId });
   }
 
-  @Trace({ name: 'storage.readExclusive', kind: SpanKind.SERVER })
-  async readExclusive(nodeId: NodeId, taskId: TaskId): Promise<ExclusiveReadResult> {
-    annotateSpan({ [ATTR.nodeId]: nodeId, [ATTR.taskId]: taskId });
+  public async readExclusive(nodeId: NodeId, taskId: TaskId): Promise<ExclusiveReadResult> {
     await this.gate.pass(nodeId);
     this.events.record({ type: 'storage.readExclusive.requested', nodeId, taskId });
     await this.sleep(this.latency.sample('storage.readExclusive'));
@@ -94,7 +85,7 @@ export class StorageService {
     return { leaseId, data: lease.data };
   }
 
-  async leaseSave(leaseId: string, data: TaskState): Promise<void> {
+  public async leaseSave(leaseId: string, data: TaskState): Promise<void> {
     const held = this.leases.get(leaseId);
     if (!held) return; // stale (e.g. force-released after a crash) — idempotent
     this.leases.delete(leaseId);
@@ -109,7 +100,7 @@ export class StorageService {
     });
   }
 
-  async leaseRelease(leaseId: string): Promise<void> {
+  public async leaseRelease(leaseId: string): Promise<void> {
     const held = this.leases.get(leaseId);
     if (!held) return;
     this.leases.delete(leaseId);
@@ -126,7 +117,7 @@ export class StorageService {
    * Force-release everything a crashed node holds or is waiting on. Without
    * this, a SIGKILLed lock holder deadlocks the run.
    */
-  async releaseNode(nodeId: NodeId): Promise<void> {
+  public async releaseNode(nodeId: NodeId): Promise<void> {
     const pending = this.pendingByNode.get(nodeId);
     if (pending) {
       for (const controller of pending) controller.abort(new NodeCrashedError(nodeId));
@@ -145,7 +136,7 @@ export class StorageService {
     }
   }
 
-  heldLeaseCount(): number {
+  public heldLeaseCount(): number {
     return this.leases.size;
   }
 

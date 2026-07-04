@@ -1,4 +1,12 @@
-import { type Delivery, type Graph, type PushType, type ScenarioInfo } from '@mozart/contracts';
+import {
+  type Delivery,
+  type Graph,
+  type PushType,
+  type ScenarioInfo,
+  type WorkerFailEvent,
+  WORKER_TOPICS,
+  type WorkerSuccessEvent,
+} from '@mozart/contracts';
 import type { IpcClient } from '@mozart/ipc';
 import { Protocol } from '@mozart/protocols';
 import {
@@ -38,7 +46,7 @@ export class ProtocolHostService {
     private readonly protocol: Protocol,
   ) {}
 
-  async start(): Promise<void> {
+  public async start(): Promise<void> {
     // Register the push handler first; anything arriving before the handshake
     // completes is buffered and drained once the scenario is known.
     this.ipc.onPush((type, payload, frame) => this.onPush(type, payload, frame.traceCtx));
@@ -83,12 +91,34 @@ export class ProtocolHostService {
     const taskId = (delivery.body as { taskId?: unknown }).taskId;
     if (typeof taskId === 'string') setTaskId(taskId);
     try {
-      await this.onMessage(delivery);
+      await this.route(delivery, taskId);
       await this.ipc.call('transport.ack', { deliveryId: delivery.deliveryId });
     } catch (err) {
       // No ack => the transport will redeliver.
-      this.logger.warn(`onMessage failed (no ack, will redeliver): ${String(err)}`);
+      this.logger.warn(`delivery failed (no ack, will redeliver): ${String(err)}`);
     }
+  }
+
+  /**
+   * Route a delivery by topic to exactly one protocol handler, narrowing the
+   * transport {@link Delivery} to a delivery-free domain event: worker topics
+   * become {@link WorkerSuccessEvent}/{@link WorkerFailEvent}, everything else
+   * is a coordinator<->coordinator {@link Message}. The host keeps the raw
+   * delivery for acking/tracing; the protocol never sees it.
+   */
+  private async route(delivery: Delivery, taskId: unknown): Promise<void> {
+    const isWorkerEvent = delivery.topic === WORKER_TOPICS.completed || delivery.topic === WORKER_TOPICS.failed;
+    if (!isWorkerEvent) {
+      await this.onMessage(delivery);
+      return;
+    }
+    if (typeof taskId !== 'string') {
+      // Malformed worker event: nothing to act on. Ack as a no-op.
+      this.logger.warn(`worker event on ${delivery.topic} without a taskId; acking as no-op`);
+      return;
+    }
+    if (delivery.topic === WORKER_TOPICS.completed) await this.onWorkerSuccess(delivery, { taskId });
+    else await this.onWorkerFail(delivery, { taskId });
   }
 
   @Trace({ name: 'protocol.persistGraph' })
@@ -103,13 +133,31 @@ export class ProtocolHostService {
     await this.protocol.startGraph(graph.id);
   }
 
+  @Trace({ name: 'protocol.onWorkerSuccess', kind: SpanKind.CONSUMER })
+  private async onWorkerSuccess(delivery: Delivery, event: WorkerSuccessEvent): Promise<void> {
+    this.annotate(delivery);
+    await this.protocol.onWorkerSuccess(event);
+  }
+
+  @Trace({ name: 'protocol.onWorkerFail', kind: SpanKind.CONSUMER })
+  private async onWorkerFail(delivery: Delivery, event: WorkerFailEvent): Promise<void> {
+    this.annotate(delivery);
+    await this.protocol.onWorkerFail(event);
+  }
+
+  // A Delivery is a structural superset of Message, so it flows straight to the
+  // protocol as the narrowed view — the transport fields stay hidden by the type.
   @Trace({ name: 'protocol.onMessage', kind: SpanKind.CONSUMER })
   private async onMessage(delivery: Delivery): Promise<void> {
+    this.annotate(delivery);
+    await this.protocol.onMessage(delivery);
+  }
+
+  private annotate(delivery: Delivery): void {
     annotateSpan({
       [ATTR.topic]: delivery.topic,
       [ATTR.messageId]: delivery.messageId,
       [ATTR.attempt]: delivery.attempt,
     });
-    await this.protocol.onMessage(delivery);
   }
 }

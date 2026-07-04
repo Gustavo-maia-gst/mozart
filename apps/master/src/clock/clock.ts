@@ -18,7 +18,7 @@ export interface Scheduler {
 }
 
 export class SystemClock implements Clock {
-  now(): number {
+  public now(): number {
     return Date.now();
   }
 }
@@ -26,7 +26,7 @@ export class SystemClock implements Clock {
 export class TimerScheduler implements Scheduler {
   private readonly timers = new Map<CancelHandle, NodeJS.Timeout>();
 
-  after(ms: number, fn: () => void): CancelHandle {
+  public after(ms: number, fn: () => void): CancelHandle {
     const handle: CancelHandle = Symbol('timer');
     const timer = setTimeout(() => {
       this.timers.delete(handle);
@@ -36,7 +36,7 @@ export class TimerScheduler implements Scheduler {
     return handle;
   }
 
-  cancel(handle: CancelHandle): void {
+  public cancel(handle: CancelHandle): void {
     const timer = this.timers.get(handle);
     if (timer) {
       clearTimeout(timer);

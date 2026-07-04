@@ -34,7 +34,7 @@ export class Channel {
 
   constructor(readonly key: ChannelKey) {}
 
-  get head(): QueuedMessage | undefined {
+  public get head(): QueuedMessage | undefined {
     return this.queue[0];
   }
 }

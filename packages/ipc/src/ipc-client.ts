@@ -43,11 +43,11 @@ export class IpcClient {
     this.channel.onClose(() => this.onClose());
   }
 
-  onPush(handler: PushHandler): void {
+  public onPush(handler: PushHandler): void {
     this.pushHandler = handler;
   }
 
-  call<M extends RpcMethod>(
+  public call<M extends RpcMethod>(
     method: M,
     payload: RpcContracts[M]['req'],
     opts?: CallOptions,

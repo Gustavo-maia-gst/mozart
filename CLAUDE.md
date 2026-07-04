@@ -46,8 +46,13 @@ Direção de dependência: `apps → packages`; `packages → contracts` apenas.
    `context.active()` sobreviver a residência em fila/timer.
 5. **Canais/redeliveries são chaveados por `nodeId`**, nunca por handle de processo
    (restart re-anexa).
-6. **Spans do master + event log são a fonte de verdade**; spans de slave são
-   best-effort (SIGKILL pode perder a janela do BatchSpanProcessor).
+6. **O event log JSONL é a fonte de verdade** pra corretude (carimba trace/span
+   id via `activeIds`). O harness é _quase silencioso em traces_: emite só
+   `transport.redeliver` (métrica de redelivery) e `worker.execute` (um span por
+   task, aberto no `worker.start` e fechado no complete/fail — cobre a duração
+   simulada). O resto da árvore vive nos coordinators (um service OTel por
+   coordinator, nomeado no YAML). Spans de slave são best-effort (SIGKILL pode
+   perder a janela do BatchSpanProcessor).
 7. Payloads IPC/mensagens são JSON puro (tipo `Json` em contracts): sem Date/Map/
    BigInt/undefined/NaN. Zod valida nas duas bordas.
 

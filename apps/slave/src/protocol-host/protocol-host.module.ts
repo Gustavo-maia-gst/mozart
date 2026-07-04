@@ -13,7 +13,7 @@ export class ProtocolHostModule {
    * it with full constructor DI) and binds the port tokens to the IPC-backed
    * harness clients.
    */
-  static forProtocol(name: string): DynamicModule {
+  public static forProtocol(name: string): DynamicModule {
     return {
       module: ProtocolHostModule,
       imports: [HarnessClientModule],

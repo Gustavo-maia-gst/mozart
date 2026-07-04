@@ -28,18 +28,18 @@ export class EventLogService {
     @Inject(ENV_CONFIG) private readonly env: EnvConfig,
   ) {}
 
-  open(): void {
+  public open(): void {
     const dir = join(this.env.MOZART_LOG_DIR, this.runId);
     mkdirSync(dir, { recursive: true });
     this.path = join(dir, 'events.jsonl');
     this.stream = createWriteStream(this.path, { flags: 'a' });
   }
 
-  get logPath(): string {
+  public get logPath(): string {
     return this.path;
   }
 
-  record(event: EventInput): HarnessEvent {
+  public record(event: EventInput): HarnessEvent {
     const ids = activeIds();
     const full: HarnessEvent = {
       ts: this.clock.now(),
@@ -54,11 +54,11 @@ export class EventLogService {
     return full;
   }
 
-  countsByType(): Record<string, number> {
+  public countsByType(): Record<string, number> {
     return Object.fromEntries(this.counts);
   }
 
-  async close(): Promise<void> {
+  public async close(): Promise<void> {
     const stream = this.stream;
     if (!stream) return;
     await new Promise<void>((resolve) => stream.end(resolve));

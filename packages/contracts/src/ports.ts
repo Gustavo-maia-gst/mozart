@@ -43,7 +43,7 @@ export interface Delivery {
  * inject it by type via the constructor, no `@Inject` needed.
  */
 export abstract class TransportPort {
-  abstract publish(to: NodeId, topic: string, body: Json): Promise<void>;
+  public abstract publish(to: NodeId, topic: string, body: Json): Promise<void>;
 }
 
 /**
@@ -51,20 +51,20 @@ export abstract class TransportPort {
  * they block until S recovers. Callers must tolerate arbitrary latency.
  */
 export abstract class StoragePort {
-  abstract read(taskId: TaskId): Promise<TaskState | null>;
+  public abstract read(taskId: TaskId): Promise<TaskState | null>;
   /**
    * Snapshot query: return every task whose state matches `query` by equality
    * on each listed attribute (see {@link StorageQuery}). No locking; like
    * `read`, it just blocks under an outage. Order is unspecified.
    */
-  abstract find(query: StorageQuery): Promise<TaskMatch[]>;
+  public abstract find(query: StorageQuery): Promise<TaskMatch[]>;
   /**
    * Loads the state of `taskId` under mutual exclusion. Blocks until the
    * lock is acquired. The lock is released by `save`/`release` on the handle,
    * or forcibly by the harness if the holding node crashes.
    */
-  abstract readExclusive(taskId: TaskId): Promise<ExclusiveRead>;
-  abstract save(taskId: TaskId, data: TaskState): Promise<void>;
+  public abstract readExclusive(taskId: TaskId): Promise<ExclusiveRead>;
+  public abstract save(taskId: TaskId, data: TaskState): Promise<void>;
 }
 
 export interface ExclusiveRead {
@@ -81,7 +81,7 @@ export interface ExclusiveRead {
  * `task.completed` / `task.failed`), subject to at-least-once semantics.
  */
 export abstract class WorkerPoolPort {
-  abstract start(taskId: TaskId): Promise<void>;
+  public abstract start(taskId: TaskId): Promise<void>;
 }
 
 /** Topics used by the Worker Pool W when notifying coordinators. */
@@ -92,4 +92,32 @@ export const WORKER_TOPICS = {
 
 export interface WorkerEventBody extends JsonObject {
   taskId: TaskId;
+}
+
+/*
+ * Domain events handed to a protocol's handlers. These deliberately expose
+ * nothing about the transport: no deliveryId/messageId/attempt/traceCtx. The
+ * host routes a raw {@link Delivery} to the right handler and narrows it to one
+ * of these views — a `Delivery` is a structural superset of {@link Message},
+ * so the same instance flows through and the harness recovers the full delivery
+ * (for acking/tracing) with `as unknown as Delivery` when it needs it. Keeping
+ * these delivery-free is what lets a protocol stay oblivious to at-least-once
+ * plumbing while still being idempotent on the domain identity (`taskId`).
+ */
+
+/** A task previously dispatched to the Worker Pool ran to completion. */
+export interface WorkerSuccessEvent {
+  readonly taskId: TaskId;
+}
+
+/** A task previously dispatched to the Worker Pool failed. */
+export interface WorkerFailEvent {
+  readonly taskId: TaskId;
+}
+
+/** A coordinator<->coordinator message. */
+export interface Message {
+  readonly from: NodeId;
+  readonly topic: string;
+  readonly body: Json;
 }

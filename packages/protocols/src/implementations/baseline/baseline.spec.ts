@@ -1,11 +1,10 @@
 import {
-  type Delivery,
   type Graph,
   ProtocolLogger,
   StoragePort,
   type TaskState,
   TransportPort,
-  WORKER_TOPICS,
+  type WorkerSuccessEvent,
   WorkerPoolPort,
 } from '@mozart/contracts';
 import { Test } from '@nestjs/testing';
@@ -56,16 +55,8 @@ async function makeProtocol(): Promise<BaselineProtocol> {
   return moduleRef.get(BaselineProtocol);
 }
 
-function completed(taskId: string): Delivery {
-  return {
-    deliveryId: `d-${taskId}`,
-    messageId: `m-${taskId}`,
-    from: 'W',
-    topic: WORKER_TOPICS.completed,
-    body: { taskId },
-    attempt: 1,
-    traceCtx: {},
-  };
+function completed(taskId: string): WorkerSuccessEvent {
+  return { taskId };
 }
 
 describe('BaselineProtocol', () => {
@@ -93,11 +84,11 @@ describe('BaselineProtocol', () => {
     await p.persistGraph(graph);
     await p.startGraph('g0');
 
-    await p.onMessage(completed('a')); // unlocks b and c
+    await p.onWorkerSuccess(completed('a')); // unlocks b and c
     expect(started).toEqual(['a', 'b', 'c']);
-    await p.onMessage(completed('b')); // d still needs c
+    await p.onWorkerSuccess(completed('b')); // d still needs c
     expect(started).toEqual(['a', 'b', 'c']);
-    await p.onMessage(completed('c')); // now d is ready
+    await p.onWorkerSuccess(completed('c')); // now d is ready
     expect(started).toEqual(['a', 'b', 'c', 'd']);
   });
 
@@ -105,8 +96,8 @@ describe('BaselineProtocol', () => {
     const p = await makeProtocol();
     await p.persistGraph(graph);
     await p.startGraph('g0');
-    await p.onMessage(completed('a'));
-    await p.onMessage(completed('a')); // duplicate / redelivery
+    await p.onWorkerSuccess(completed('a'));
+    await p.onWorkerSuccess(completed('a')); // duplicate / redelivery
     expect(started).toEqual(['a', 'b', 'c']);
   });
 });
