@@ -1,0 +1,14 @@
+name: echo-nofault
+seed: 7
+protocol: echo
+nodes: [{ id: n1 }, { id: n2 }]
+dag:
+  tasks: [{ id: t1, costMs: 200 }, { id: t2, dependsOn: [t1], costMs: 200 }]
+storage: { adapter: in-memory }
+transport: { ackTimeoutMs: 2000 }
+latency:
+  transport.deliver: { distribution: normal, mean: 20, stddev: 5 }
+  storage.read: { distribution: constant, value: 5 }
+  storage.readExclusive: { distribution: constant, value: 8 }
+  storage.save: { distribution: constant, value: 6 }
+endCondition: { type: timeout, ms: 2500 }

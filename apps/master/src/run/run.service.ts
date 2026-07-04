@@ -1,7 +1,15 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { trace } from '@opentelemetry/api';
 import type { Scenario } from '@mozart/contracts';
+import { ATTR, TRACER_NAME, withSpan } from '@mozart/telemetry';
+import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
-import { RUN_ID, SCENARIO } from '../tokens';
+import { ProcessManagerService } from '../ipc-server/process-manager.service';
+import { RUN_ID, SCENARIO, SCHEDULER } from '../tokens';
+
+const tracer = trace.getTracer(TRACER_NAME);
+const READY_TIMEOUT_MS = 10_000;
+const DRAIN_MS = 300;
 
 export interface RunOptions {
   dryRun?: boolean;
@@ -14,10 +22,7 @@ export interface RunSummary {
   events: Record<string, number>;
 }
 
-/**
- * Orchestrates a run's lifecycle. This skeleton covers config/event-log wiring;
- * spawning slaves, arming faults and end conditions are layered in later.
- */
+/** Orchestrates a run: spawn slaves, activate, wait for the end condition, shut down. */
 @Injectable()
 export class RunService {
   private readonly logger = new Logger(RunService.name);
@@ -25,17 +30,22 @@ export class RunService {
   constructor(
     @Inject(SCENARIO) private readonly scenario: Scenario,
     @Inject(RUN_ID) private readonly runId: string,
+    @Inject(SCHEDULER) private readonly scheduler: Scheduler,
     private readonly events: EventLogService,
+    private readonly pm: ProcessManagerService,
   ) {}
 
   async run(opts: RunOptions = {}): Promise<RunSummary> {
     this.events.open();
     this.events.record({ type: 'run.started', data: { scenario: this.scenario.name } });
-    this.logger.log(`run ${this.runId} — scenario "${this.scenario.name}" (protocol=${this.scenario.protocol})`);
+    this.logger.log(`run ${this.runId} — scenario "${this.scenario.name}"`);
 
-    if (opts.dryRun) {
-      this.logger.log(
-        `dry-run: ${this.scenario.nodes.length} node(s), ${this.scenario.dag.tasks.length} task(s), ${this.scenario.faults.length} fault(s)`,
+    if (!opts.dryRun) {
+      await withSpan(
+        tracer,
+        `run ${this.scenario.name}`,
+        { attributes: { [ATTR.runId]: this.runId } },
+        () => this.execute(),
       );
     }
 
@@ -48,5 +58,23 @@ export class RunService {
     };
     await this.events.close();
     return summary;
+  }
+
+  private async execute(): Promise<void> {
+    this.pm.spawnAll();
+    await this.pm.awaitAllReady(READY_TIMEOUT_MS);
+    this.logger.log('all nodes ready — activating protocol');
+    // activate under the run's active span so the whole run is one trace tree.
+    this.pm.activateAll();
+
+    await this.sleep(this.scenario.endCondition.ms);
+
+    this.logger.log('end condition reached — shutting down');
+    this.pm.shutdown();
+    await this.sleep(DRAIN_MS); // let deactivate/exit + trailing events land
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise<void>((resolve) => this.scheduler.after(ms, resolve));
   }
 }
