@@ -1,11 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
 import { LatencyModel } from '@mozart/latency';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { TimerScheduler } from '../clock/clock';
 import type { EventInput, EventLogService } from '../event-log/event-log.service';
 import { InMemoryStorageAdapter } from './in-memory.adapter';
+import { StorageService } from './storage.service';
 import { NodeCrashedError } from './storage-adapter';
 import { StorageGate } from './storage-gate';
-import { StorageService } from './storage.service';
 
 class FakeEventLog {
   readonly events: EventInput[] = [];

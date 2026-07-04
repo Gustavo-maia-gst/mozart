@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
 import type { NodeId } from '@mozart/contracts';
+import { Injectable } from '@nestjs/common';
 
 interface Waiter {
   nodeId: NodeId;

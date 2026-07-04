@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { LatencyModel } from '@mozart/latency';
 import type { Delivery, NodeId, Scenario } from '@mozart/contracts';
+import { LatencyModel } from '@mozart/latency';
+import { beforeEach, describe, expect, it } from 'vitest';
 import type { CancelHandle, Clock, Scheduler } from '../clock/clock';
-import type { EventLogService, EventInput } from '../event-log/event-log.service';
-import { NetworkState, type DeliverySink } from './delivery-sink';
+import type { EventInput, EventLogService } from '../event-log/event-log.service';
+import { type DeliverySink, NetworkState } from './delivery-sink';
 import { TransportService } from './transport.service';
 
 /** Deterministic virtual time: timers fire in order when `advance` is called. */

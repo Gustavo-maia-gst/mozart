@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
 import type { Delivery, NodeId } from '@mozart/contracts';
+import { Injectable } from '@nestjs/common';
 
 export const DELIVERY_SINK = Symbol('DELIVERY_SINK');
 

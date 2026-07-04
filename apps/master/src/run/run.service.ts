@@ -1,7 +1,7 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { trace } from '@opentelemetry/api';
 import type { Scenario } from '@mozart/contracts';
 import { ATTR, TRACER_NAME, withSpan } from '@mozart/telemetry';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { trace } from '@opentelemetry/api';
 import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
 import { FaultInjectorService } from '../fault/fault-injector.service';
@@ -28,6 +28,7 @@ export interface RunSummary {
 export class RunService {
   private readonly logger = new Logger(RunService.name);
 
+  // biome-ignore lint/complexity/useMaxParams: deps injection
   constructor(
     @Inject(SCENARIO) private readonly scenario: Scenario,
     @Inject(RUN_ID) private readonly runId: string,
@@ -43,11 +44,8 @@ export class RunService {
     this.logger.log(`run ${this.runId} — scenario "${this.scenario.name}"`);
 
     if (!opts.dryRun) {
-      await withSpan(
-        tracer,
-        `run ${this.scenario.name}`,
-        { attributes: { [ATTR.runId]: this.runId } },
-        () => this.execute(),
+      await withSpan(tracer, `run ${this.scenario.name}`, { attributes: { [ATTR.runId]: this.runId } }, () =>
+        this.execute(),
       );
     }
 

@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { Test } from '@nestjs/testing';
 import type { HarnessEvent, Scenario } from '@mozart/contracts';
 import { initTelemetry, type Telemetry } from '@mozart/telemetry';
+import { Test } from '@nestjs/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CoreModule } from '../src/core/core.module';
 import { RunModule } from '../src/run/run.module';
@@ -10,8 +10,7 @@ import { RunService } from '../src/run/run.service';
 
 const repoRoot = join(__dirname, '..', '..', '..');
 const slaveEntry = join(repoRoot, 'apps', 'slave', 'dist', 'main.js');
-const distReady =
-  existsSync(slaveEntry) && existsSync(join(repoRoot, 'packages', 'ipc', 'dist', 'index.js'));
+const distReady = existsSync(slaveEntry) && existsSync(join(repoRoot, 'packages', 'ipc', 'dist', 'index.js'));
 const logDir = 'runs/__e2e__';
 
 const scenario: Scenario = {
@@ -86,9 +85,7 @@ describe.runIf(distReady)('echo run under a kill+restart fault (e2e)', () => {
     const redelivN2 = ofType('transport.redelivered').filter((e) => e.channel === 'n1->n2');
     expect(redelivN2.length).toBeGreaterThanOrEqual(1);
     const firstRedeliverSeq = Math.min(...redelivN2.map((e) => e.seq));
-    const ackedN2After = ofType('transport.acked').filter(
-      (e) => e.channel === 'n1->n2' && e.seq > firstRedeliverSeq,
-    );
+    const ackedN2After = ofType('transport.acked').filter((e) => e.channel === 'n1->n2' && e.seq > firstRedeliverSeq);
     expect(ackedN2After.length).toBeGreaterThanOrEqual(1);
 
     expect(ofType('run.finished')).toHaveLength(1);
@@ -97,9 +94,7 @@ describe.runIf(distReady)('echo run under a kill+restart fault (e2e)', () => {
     const byMessage = new Map<string, Set<string>>();
     for (const e of events) {
       if (!e.messageId || !e.traceId) continue;
-      (byMessage.get(e.messageId) ?? byMessage.set(e.messageId, new Set()).get(e.messageId)!).add(
-        e.traceId,
-      );
+      (byMessage.get(e.messageId) ?? byMessage.set(e.messageId, new Set()).get(e.messageId)!).add(e.traceId);
     }
     expect(byMessage.size).toBeGreaterThan(0);
     for (const [, traceIds] of byMessage) expect(traceIds.size).toBe(1);

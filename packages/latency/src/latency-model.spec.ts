@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import type { DistributionConfig } from '@mozart/contracts';
+import { describe, expect, it } from 'vitest';
 import { LatencyModel } from './latency-model';
 
 const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;

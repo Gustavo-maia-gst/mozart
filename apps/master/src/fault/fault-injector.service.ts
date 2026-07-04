@@ -1,13 +1,13 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { FaultSpec, NodeId, Scenario, TaskId } from '@mozart/contracts';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
 import { ProcessManagerService } from '../ipc-server/process-manager.service';
 import { StorageGate } from '../storage/storage-gate';
+import { SCENARIO, SCHEDULER } from '../tokens';
 import { NetworkState } from '../transport/delivery-sink';
 import { TransportService } from '../transport/transport.service';
 import { WorkerPoolService } from '../worker-pool/worker-pool.service';
-import { SCENARIO, SCHEDULER } from '../tokens';
 
 /**
  * Injects the scenario's fault schedule and exposes the same actions
@@ -18,6 +18,7 @@ import { SCENARIO, SCHEDULER } from '../tokens';
 export class FaultInjectorService {
   private readonly logger = new Logger(FaultInjectorService.name);
 
+  // biome-ignore lint/complexity/useMaxParams: deps injection
   constructor(
     @Inject(SCENARIO) private readonly scenario: Scenario,
     @Inject(SCHEDULER) private readonly scheduler: Scheduler,

@@ -1,19 +1,14 @@
 import { randomUUID } from 'node:crypto';
+import type { NodeId, TaskId, TaskState } from '@mozart/contracts';
+import type { LatencyModel } from '@mozart/latency';
+import { ATTR, TRACER_NAME, withSpan } from '@mozart/telemetry';
 import { Inject, Injectable } from '@nestjs/common';
 import { SpanKind, trace } from '@opentelemetry/api';
-import type { NodeId, TaskId, TaskState } from '@mozart/contracts';
-import { ATTR, TRACER_NAME, withSpan } from '@mozart/telemetry';
-import type { LatencyModel } from '@mozart/latency';
 import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
 import { LATENCY_MODEL, SCHEDULER } from '../tokens';
+import { type AdapterLease, NodeCrashedError, STORAGE_ADAPTER, type StorageAdapter } from './storage-adapter';
 import { StorageGate } from './storage-gate';
-import {
-  NodeCrashedError,
-  STORAGE_ADAPTER,
-  type AdapterLease,
-  type StorageAdapter,
-} from './storage-adapter';
 
 const tracer = trace.getTracer(TRACER_NAME);
 

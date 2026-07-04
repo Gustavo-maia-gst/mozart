@@ -1,6 +1,6 @@
-import { Pool } from 'pg';
 import type { TaskId, TaskState } from '@mozart/contracts';
-import { NodeCrashedError, type AdapterLease, type StorageAdapter } from './storage-adapter';
+import { Pool } from 'pg';
+import { type AdapterLease, NodeCrashedError, type StorageAdapter } from './storage-adapter';
 
 const UPSERT = `insert into task_state(task_id, data, version) values ($1, $2, 0)
   on conflict (task_id) do update set data = excluded.data, version = task_state.version + 1`;
@@ -34,10 +34,7 @@ export class PostgresStorageAdapter implements StorageAdapter {
   }
 
   async read(taskId: TaskId): Promise<TaskState | null> {
-    const r = await this.pool.query<{ data: TaskState }>(
-      'select data from task_state where task_id = $1',
-      [taskId],
-    );
+    const r = await this.pool.query<{ data: TaskState }>('select data from task_state where task_id = $1', [taskId]);
     return r.rows[0]?.data ?? null;
   }
 
@@ -47,8 +44,7 @@ export class PostgresStorageAdapter implements StorageAdapter {
 
   async acquire(taskId: TaskId, signal: AbortSignal): Promise<AdapterLease> {
     const client = await this.pool.connect();
-    const pid = (await client.query<{ pid: number }>('select pg_backend_pid() as pid')).rows[0]!
-      .pid;
+    const pid = (await client.query<{ pid: number }>('select pg_backend_pid() as pid')).rows[0]!.pid;
     const onAbort = (): void => {
       void this.pool.query('select pg_cancel_backend($1)', [pid]).catch(() => {});
     };
@@ -61,10 +57,9 @@ export class PostgresStorageAdapter implements StorageAdapter {
       // exclusion even when the row does not exist yet (plain FOR UPDATE locks
       // nothing on a missing row). Auto-released on COMMIT/ROLLBACK = our lease.
       await client.query('select pg_advisory_xact_lock(hashtext($1))', [taskId]);
-      const r = await client.query<{ data: TaskState }>(
-        'select data from task_state where task_id = $1 for update',
-        [taskId],
-      );
+      const r = await client.query<{ data: TaskState }>('select data from task_state where task_id = $1 for update', [
+        taskId,
+      ]);
       signal.removeEventListener('abort', onAbort);
 
       let done = false;

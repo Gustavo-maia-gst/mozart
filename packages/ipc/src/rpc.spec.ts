@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
 import type { IpcFrame, RpcMethod } from '@mozart/contracts';
+import { describe, expect, it, vi } from 'vitest';
+import { IpcChannelClosedError, RpcRemoteError, RpcTimeoutError } from './errors';
 import type { FrameChannel } from './frame-channel';
 import { IpcClient } from './ipc-client';
 import { NodeLink, type RpcHandlers } from './node-link';
-import { IpcChannelClosedError, RpcRemoteError, RpcTimeoutError } from './errors';
 
 /** Two FrameChannels wired to each other, faithful to the JSON wire boundary. */
 function linkedChannels(): { client: FrameChannel; host: FrameChannel; close: () => void } {
@@ -76,11 +76,7 @@ describe('IpcClient <-> NodeLink RPC', () => {
 
   it('propagates remote handler errors as RpcRemoteError', async () => {
     const { client, host } = linkedChannels();
-    new NodeLink(
-      'n1',
-      host,
-      makeHandlers({ 'worker.start': () => Promise.reject(new Error('boom')) }),
-    );
+    new NodeLink('n1', host, makeHandlers({ 'worker.start': () => Promise.reject(new Error('boom')) }));
     const c = new IpcClient(client);
     await expect(c.call('worker.start', { taskId: 't1' })).rejects.toBeInstanceOf(RpcRemoteError);
   });
@@ -125,25 +121,18 @@ describe('IpcClient <-> NodeLink RPC', () => {
     const { client, host } = linkedChannels();
     new NodeLink('n1', host, makeHandlers({ 'storage.read': () => new Promise<never>(() => {}) }));
     const c = new IpcClient(client);
-    await expect(
-      c.call('storage.read', { taskId: 't1' }, { timeoutMs: 20 }),
-    ).rejects.toBeInstanceOf(RpcTimeoutError);
+    await expect(c.call('storage.read', { taskId: 't1' }, { timeoutMs: 20 })).rejects.toBeInstanceOf(RpcTimeoutError);
   });
 
   it('runs host handlers within the extracted trace context', async () => {
     const { client, host } = linkedChannels();
     const seen: string[] = [];
-    new NodeLink(
-      'n1',
-      host,
-      makeHandlers({ 'node.ready': () => Promise.resolve({ scenario: {} as never }) }),
-      {
-        runWithTraceCtx: (carrier, fn) => {
-          seen.push(carrier.marker ?? 'none');
-          return fn();
-        },
+    new NodeLink('n1', host, makeHandlers({ 'node.ready': () => Promise.resolve({ scenario: {} as never }) }), {
+      runWithTraceCtx: (carrier, fn) => {
+        seen.push(carrier.marker ?? 'none');
+        return fn();
       },
-    );
+    });
     const c = new IpcClient(client, {
       injectTraceCtx: (carrier) => {
         carrier.marker = 'from-client';

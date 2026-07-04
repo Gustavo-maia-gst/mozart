@@ -1,11 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
-import type { RpcHandlers } from '@mozart/ipc';
 import type { NodeId, Scenario } from '@mozart/contracts';
+import type { RpcHandlers } from '@mozart/ipc';
+import { Inject, Injectable } from '@nestjs/common';
+import { scenarioInfoFor } from '../scenario/scenario';
 import { StorageService } from '../storage/storage.service';
+import { RUN_ID, SCENARIO } from '../tokens';
 import { TransportService } from '../transport/transport.service';
 import { WorkerPoolService } from '../worker-pool/worker-pool.service';
-import { RUN_ID, SCENARIO } from '../tokens';
-import { scenarioInfoFor } from '../scenario/scenario';
 
 /**
  * Single ingress: maps RPC methods from slaves onto the master's services.

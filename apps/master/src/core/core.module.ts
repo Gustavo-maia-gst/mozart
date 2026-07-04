@@ -1,6 +1,6 @@
-import { Global, Module, type DynamicModule } from '@nestjs/common';
 import type { Scenario } from '@mozart/contracts';
 import { LatencyModel } from '@mozart/latency';
+import { type DynamicModule, Global, Module } from '@nestjs/common';
 import { ClockModule } from '../clock/clock';
 import type { EnvConfig } from '../config/env';
 import { ENV_CONFIG, LATENCY_MODEL, RUN_ID, SCENARIO } from '../tokens';

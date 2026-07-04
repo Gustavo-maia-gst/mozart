@@ -1,8 +1,8 @@
 import { fork } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
 import type { RpcMethod } from '@mozart/contracts';
+import { afterEach, describe, expect, it } from 'vitest';
 import { childFrameChannel, NodeLink, type RpcHandlers } from '../src';
 
 const distReady = existsSync(join(__dirname, '..', 'dist', 'index.js'));

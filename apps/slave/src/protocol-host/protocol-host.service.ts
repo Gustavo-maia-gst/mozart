@@ -1,6 +1,3 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
-import { SpanKind, trace, type Attributes } from '@opentelemetry/api';
 import type {
   Delivery,
   JsonObject,
@@ -11,8 +8,11 @@ import type {
   ScenarioInfo,
 } from '@mozart/contracts';
 import type { IpcClient } from '@mozart/ipc';
-import { ATTR, runWithExtractedContext, TRACER_NAME, withSpan } from '@mozart/telemetry';
 import { resolveProtocol } from '@mozart/protocols';
+import { ATTR, runWithExtractedContext, TRACER_NAME, withSpan } from '@mozart/telemetry';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import { type Attributes, SpanKind, trace } from '@opentelemetry/api';
 import { StorageClient, TransportClient, WorkerPoolClient } from '../harness-client/ports';
 import { IPC_CLIENT, NODE_ID, PROTOCOL_NAME } from '../tokens';
 
@@ -36,6 +36,7 @@ export class ProtocolHostService {
   private ready = false;
   private readonly buffer: BufferedPush[] = [];
 
+  // biome-ignore lint/complexity/useMaxParams: deps injection
   constructor(
     @Inject(IPC_CLIENT) private readonly ipc: IpcClient,
     @Inject(NODE_ID) private readonly nodeId: string,

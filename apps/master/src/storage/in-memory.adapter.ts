@@ -1,6 +1,6 @@
-import { Mutex, type MutexInterface } from 'async-mutex';
 import type { TaskId, TaskState } from '@mozart/contracts';
-import { NodeCrashedError, type AdapterLease, type StorageAdapter } from './storage-adapter';
+import { Mutex, type MutexInterface } from 'async-mutex';
+import { type AdapterLease, NodeCrashedError, type StorageAdapter } from './storage-adapter';
 
 /** In-memory S: a map plus one mutex per task for readExclusive. */
 export class InMemoryStorageAdapter implements StorageAdapter {

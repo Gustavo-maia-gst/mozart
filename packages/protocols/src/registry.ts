@@ -1,5 +1,5 @@
-import type { Type } from '@nestjs/common';
 import type { ProtocolSpi } from '@mozart/contracts';
+import type { Type } from '@nestjs/common';
 import { EchoProtocol } from './echo';
 
 /** Name -> protocol class. Slaves resolve their protocol by MOZART_PROTOCOL. */

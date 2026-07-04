@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { jsonObjectSchema, jsonSchema, type Json } from './json';
+import { type Json, jsonObjectSchema, jsonSchema } from './json';
 import type { Delivery, TaskState } from './ports';
 import type { ScenarioInfo } from './scenario';
 

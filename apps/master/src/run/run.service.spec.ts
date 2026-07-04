@@ -1,6 +1,6 @@
 import { readFileSync, rmSync } from 'node:fs';
-import { Test } from '@nestjs/testing';
 import type { Scenario } from '@mozart/contracts';
+import { Test } from '@nestjs/testing';
 import { afterAll, describe, expect, it } from 'vitest';
 import { CoreModule } from '../core/core.module';
 import { RunModule } from './run.module';

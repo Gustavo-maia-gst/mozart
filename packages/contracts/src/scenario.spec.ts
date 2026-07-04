@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 import { scenarioSchema } from './scenario';
 
 const scenariosDir = join(__dirname, '..', '..', '..', 'scenarios');

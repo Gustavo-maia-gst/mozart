@@ -1,6 +1,6 @@
+import type { DistributionConfig } from '@mozart/contracts';
 import { randomLogNormal, randomNormal, randomUniform } from 'd3-random';
 import seedrandom from 'seedrandom';
-import type { DistributionConfig } from '@mozart/contracts';
 
 type Sampler = () => number;
 

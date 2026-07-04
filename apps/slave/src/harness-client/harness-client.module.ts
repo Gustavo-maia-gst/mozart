@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
 import { IpcClient, processFrameChannel } from '@mozart/ipc';
 import { traceContextHooks } from '@mozart/telemetry';
+import { Module } from '@nestjs/common';
 import { IPC_CLIENT } from '../tokens';
 import { StorageClient, TransportClient, WorkerPoolClient } from './ports';
 

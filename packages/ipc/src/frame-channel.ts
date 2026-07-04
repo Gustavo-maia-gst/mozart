@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
 import type { ChildProcess } from 'node:child_process';
-import { ipcFrameSchema, type IpcFrame } from '@mozart/contracts';
+import { randomUUID } from 'node:crypto';
+import { type IpcFrame, ipcFrameSchema } from '@mozart/contracts';
 
 /**
  * A bidirectional frame pipe. Both endpoints (slave->parent, master->child)
@@ -49,10 +49,7 @@ function attachMessageValidation(
 }
 
 /** Slave-side channel to the parent (master) process. */
-export function processFrameChannel(
-  proc: NodeJS.Process = process,
-  opts?: FrameChannelOptions,
-): FrameChannel {
+export function processFrameChannel(proc: NodeJS.Process = process, opts?: FrameChannelOptions): FrameChannel {
   return {
     send: (frame) => guardedSend((f) => (proc.send ? proc.send(f) : false), frame),
     onMessage: (cb) => attachMessageValidation(proc, opts, cb),

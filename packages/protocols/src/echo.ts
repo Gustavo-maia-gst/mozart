@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
 import {
-  WORKER_TOPICS,
   type Delivery,
   type JsonObject,
   type ProtocolContext,
   type ProtocolSpi,
+  WORKER_TOPICS,
 } from '@mozart/contracts';
+import { Injectable } from '@nestjs/common';
 
 const PING = 'ping';
 const PONG = 'pong';

@@ -1,13 +1,13 @@
-import { Module } from '@nestjs/common';
 import type { Scenario } from '@mozart/contracts';
+import { Module } from '@nestjs/common';
 import type { EnvConfig } from '../config/env';
 import { EventLogModule } from '../event-log/event-log.module';
 import { ENV_CONFIG, SCENARIO } from '../tokens';
 import { InMemoryStorageAdapter } from './in-memory.adapter';
 import { PostgresStorageAdapter } from './postgres.adapter';
-import { StorageGate } from './storage-gate';
-import { STORAGE_ADAPTER, type StorageAdapter } from './storage-adapter';
 import { StorageService } from './storage.service';
+import { STORAGE_ADAPTER, type StorageAdapter } from './storage-adapter';
+import { StorageGate } from './storage-gate';
 
 @Module({
   imports: [EventLogModule],

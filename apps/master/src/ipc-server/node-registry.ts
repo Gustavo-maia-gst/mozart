@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import type { NodeLink } from '@mozart/ipc';
 import type { Delivery, NodeId } from '@mozart/contracts';
+import type { NodeLink } from '@mozart/ipc';
+import { Injectable, Logger } from '@nestjs/common';
 import type { DeliverySink } from '../transport/delivery-sink';
 
 /**
@@ -32,7 +32,7 @@ export class NodeRegistry implements DeliverySink {
 
   deliver(to: NodeId, delivery: Delivery): boolean {
     const link = this.links.get(to);
-    if (!link || !link.alive) return false; // crashed/absent — transport will retry
+    if (!link?.alive) return false; // crashed/absent — transport will retry
     const sent = link.push('delivery', delivery);
     if (!sent) this.logger.warn(`push to ${to} not writable (buffer full or closing)`);
     return sent;

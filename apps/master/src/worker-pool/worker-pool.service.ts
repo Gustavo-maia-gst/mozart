@@ -1,18 +1,12 @@
+import { type NodeId, type Scenario, type TaskId, WORKER_NODE_ID, WORKER_TOPICS } from '@mozart/contracts';
+import type { LatencyModel } from '@mozart/latency';
+import { ATTR, injectActiveContext, runWithExtractedContext, TRACER_NAME } from '@mozart/telemetry';
 import { Inject, Injectable } from '@nestjs/common';
 import { context, SpanKind, trace } from '@opentelemetry/api';
-import {
-  WORKER_NODE_ID,
-  WORKER_TOPICS,
-  type NodeId,
-  type Scenario,
-  type TaskId,
-} from '@mozart/contracts';
-import { ATTR, injectActiveContext, runWithExtractedContext, TRACER_NAME } from '@mozart/telemetry';
-import type { LatencyModel } from '@mozart/latency';
 import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
-import { TransportService } from '../transport/transport.service';
 import { LATENCY_MODEL, SCENARIO, SCHEDULER } from '../tokens';
+import { TransportService } from '../transport/transport.service';
 
 const tracer = trace.getTracer(TRACER_NAME);
 const TASK_DURATION = 'worker.taskDuration';

@@ -1,21 +1,14 @@
 import { randomUUID } from 'node:crypto';
+import { type ChannelKey, channelKey, type Delivery, type Json, type NodeId, type Scenario } from '@mozart/contracts';
+import type { LatencyModel } from '@mozart/latency';
+import { ATTR, injectActiveContext, runWithExtractedContext, TRACER_NAME } from '@mozart/telemetry';
 import { Inject, Injectable } from '@nestjs/common';
 import { context, SpanKind, trace } from '@opentelemetry/api';
-import {
-  channelKey,
-  type ChannelKey,
-  type Delivery,
-  type Json,
-  type NodeId,
-  type Scenario,
-} from '@mozart/contracts';
-import { ATTR, injectActiveContext, runWithExtractedContext, TRACER_NAME } from '@mozart/telemetry';
 import type { Clock, Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
 import { CLOCK, LATENCY_MODEL, SCENARIO, SCHEDULER } from '../tokens';
-import type { LatencyModel } from '@mozart/latency';
 import { Channel, type QueuedMessage } from './channel';
-import { DELIVERY_SINK, NetworkState, type DeliverySink } from './delivery-sink';
+import { DELIVERY_SINK, type DeliverySink, NetworkState } from './delivery-sink';
 
 const tracer = trace.getTracer(TRACER_NAME);
 const DELIVER_LATENCY = 'transport.deliver';
@@ -32,6 +25,7 @@ export class TransportService {
   private readonly outstanding = new Map<string, Channel>();
   private readonly ackTimeoutMs: number;
 
+  // biome-ignore lint/complexity/useMaxParams: deps injection
   constructor(
     @Inject(SCHEDULER) private readonly scheduler: Scheduler,
     @Inject(CLOCK) private readonly clock: Clock,

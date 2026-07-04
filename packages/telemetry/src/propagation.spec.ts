@@ -1,9 +1,5 @@
 import { trace } from '@opentelemetry/api';
-import {
-  InMemorySpanExporter,
-  NodeTracerProvider,
-  SimpleSpanProcessor,
-} from '@opentelemetry/sdk-trace-node';
+import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { injectActiveContext, runWithExtractedContext } from './propagation';
 import { withSpan } from './spans';

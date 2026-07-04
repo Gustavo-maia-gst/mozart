@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { type Scenario, type ScenarioInfo, scenarioSchema } from '@mozart/contracts';
 import { parse } from 'yaml';
-import { scenarioSchema, type Scenario, type ScenarioInfo } from '@mozart/contracts';
 
 /** Loads and validates a scenario YAML file. Throws with a readable zod error. */
 export function loadScenario(path: string): Scenario {

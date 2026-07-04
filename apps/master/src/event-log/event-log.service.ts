@@ -1,11 +1,11 @@
 import { createWriteStream, mkdirSync, type WriteStream } from 'node:fs';
 import { join } from 'node:path';
-import { Inject, Injectable } from '@nestjs/common';
 import type { EventType, HarnessEvent } from '@mozart/contracts';
 import { activeIds } from '@mozart/telemetry';
-import { CLOCK, ENV_CONFIG, RUN_ID } from '../tokens';
+import { Inject, Injectable } from '@nestjs/common';
 import type { Clock } from '../clock/clock';
 import type { EnvConfig } from '../config/env';
+import { CLOCK, ENV_CONFIG, RUN_ID } from '../tokens';
 
 export type EventInput = Omit<HarnessEvent, 'ts' | 'seq' | 'runId' | 'traceId' | 'spanId'> &
   Partial<Pick<HarnessEvent, 'traceId' | 'spanId'>>;
@@ -50,7 +50,7 @@ export class EventLogService {
       ...event,
     };
     this.counts.set(full.type, (this.counts.get(full.type) ?? 0) + 1);
-    this.stream?.write(JSON.stringify(full) + '\n');
+    this.stream?.write(`${JSON.stringify(full)}\n`);
     return full;
   }
 

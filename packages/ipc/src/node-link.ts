@@ -1,22 +1,19 @@
-import type { ZodType } from 'zod';
 import {
-  rpcPayloadSchemas,
   type IpcFrame,
   type NodeId,
   type PushContracts,
   type PushType,
   type RpcContracts,
   type RpcMethod,
+  rpcPayloadSchemas,
 } from '@mozart/contracts';
-import { newFrame, type FrameChannel } from './frame-channel';
-import { resolveHooks, type IpcHooks } from './hooks';
+import type { ZodType } from 'zod';
+import { type FrameChannel, newFrame } from './frame-channel';
+import { type IpcHooks, resolveHooks } from './hooks';
 
 /** Master-side RPC handlers, invoked with the originating node id. */
 export type RpcHandlers = {
-  [M in RpcMethod]: (
-    nodeId: NodeId,
-    payload: RpcContracts[M]['req'],
-  ) => Promise<RpcContracts[M]['res']>;
+  [M in RpcMethod]: (nodeId: NodeId, payload: RpcContracts[M]['req']) => Promise<RpcContracts[M]['res']>;
 };
 
 /**
@@ -73,8 +70,7 @@ export class NodeLink {
       .then((res) => this.sendResult(frame, res))
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
-        const code =
-          err && typeof err === 'object' && 'code' in err ? String(err.code) : 'handler_error';
+        const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : 'handler_error';
         this.sendError(frame, code, message);
       });
   }

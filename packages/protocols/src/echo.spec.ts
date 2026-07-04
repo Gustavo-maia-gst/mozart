@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import type {
   Delivery,
   ProtocolContext,
@@ -7,6 +6,7 @@ import type {
   TransportPort,
   WorkerPoolPort,
 } from '@mozart/contracts';
+import { describe, expect, it } from 'vitest';
 import { EchoProtocol } from './echo';
 
 function makeCtx(tasks: { id: string; dependsOn: string[] }[] = [{ id: 't1', dependsOn: [] }]) {

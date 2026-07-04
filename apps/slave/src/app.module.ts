@@ -1,4 +1,4 @@
-import { Module, type DynamicModule } from '@nestjs/common';
+import { type DynamicModule, Module } from '@nestjs/common';
 import { ProtocolHostModule } from './protocol-host/protocol-host.module';
 import { NODE_ID, PROTOCOL_NAME, RUN_ID } from './tokens';
 

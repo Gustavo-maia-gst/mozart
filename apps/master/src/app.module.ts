@@ -1,4 +1,4 @@
-import { Module, type DynamicModule } from '@nestjs/common';
+import { type DynamicModule, Module } from '@nestjs/common';
 import { CoreModule, type CoreParams } from './core/core.module';
 import { RunModule } from './run/run.module';
 

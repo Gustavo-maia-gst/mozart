@@ -92,15 +92,11 @@ export const scenarioSchema = z.object({
       url: z.string().optional(),
     }),
   ]),
-  transport: z
-    .object({ ackTimeoutMs: z.number().positive().default(2000) })
-    .default({ ackTimeoutMs: 2000 }),
+  transport: z.object({ ackTimeoutMs: z.number().positive().default(2000) }).default({ ackTimeoutMs: 2000 }),
   /** Latency per action type; unlisted actions default to constant 0. */
   latency: z.record(z.string(), distributionSchema).default({}),
   faults: z.array(faultSchema).default([]),
-  endCondition: z.discriminatedUnion('type', [
-    z.object({ type: z.literal('timeout'), ms: z.number().positive() }),
-  ]),
+  endCondition: z.discriminatedUnion('type', [z.object({ type: z.literal('timeout'), ms: z.number().positive() })]),
 });
 
 export type Scenario = z.infer<typeof scenarioSchema>;

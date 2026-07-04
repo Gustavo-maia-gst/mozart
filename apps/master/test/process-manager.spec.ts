@@ -1,7 +1,7 @@
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { Test } from '@nestjs/testing';
 import type { Scenario } from '@mozart/contracts';
+import { Test } from '@nestjs/testing';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CoreModule } from '../src/core/core.module';
 import { EventLogService } from '../src/event-log/event-log.service';
@@ -10,9 +10,7 @@ import { NodeRegistry } from '../src/ipc-server/node-registry';
 import { ProcessManagerService } from '../src/ipc-server/process-manager.service';
 import { StorageService } from '../src/storage/storage.service';
 
-const distReady = existsSync(
-  join(__dirname, '..', '..', '..', 'packages', 'ipc', 'dist', 'index.js'),
-);
+const distReady = existsSync(join(__dirname, '..', '..', '..', 'packages', 'ipc', 'dist', 'index.js'));
 const fixture = join(__dirname, 'fixture-node.cjs');
 const logDir = 'runs/__pmtest__';
 

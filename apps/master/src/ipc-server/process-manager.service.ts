@@ -1,9 +1,9 @@
-import { fork, type ChildProcess } from 'node:child_process';
+import { type ChildProcess, fork } from 'node:child_process';
 import { join } from 'node:path';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { NodeId, Scenario } from '@mozart/contracts';
 import { childFrameChannel, NodeLink, type RpcHandlers } from '@mozart/ipc';
 import { traceContextHooks } from '@mozart/telemetry';
-import type { NodeId, Scenario } from '@mozart/contracts';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { EnvConfig } from '../config/env';
 import { EventLogService } from '../event-log/event-log.service';
 import { coordinatorIds } from '../scenario/scenario';
@@ -31,6 +31,7 @@ export class ProcessManagerService {
   private readonly ready = new Set<NodeId>();
   private readyCheck?: () => void;
 
+  // biome-ignore lint/complexity/useMaxParams: deps injection
   constructor(
     @Inject(SCENARIO) private readonly scenario: Scenario,
     @Inject(RUN_ID) private readonly runId: string,
@@ -49,8 +50,7 @@ export class ProcessManagerService {
   }
 
   spawn(nodeId: NodeId): void {
-    const entrypoint =
-      this.env.MOZART_SLAVE_ENTRYPOINT ?? join(process.cwd(), 'apps/slave/dist/main.js');
+    const entrypoint = this.env.MOZART_SLAVE_ENTRYPOINT ?? join(process.cwd(), 'apps/slave/dist/main.js');
     const child = fork(entrypoint, [], {
       serialization: 'json',
       execArgv: [],
@@ -60,9 +60,7 @@ export class ProcessManagerService {
         MOZART_PROTOCOL: this.scenario.protocol,
         MOZART_RUN_ID: this.runId,
         OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: this.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
-        ...(this.env.MOZART_OTEL_PROCESSOR
-          ? { MOZART_OTEL_PROCESSOR: this.env.MOZART_OTEL_PROCESSOR }
-          : {}),
+        ...(this.env.MOZART_OTEL_PROCESSOR ? { MOZART_OTEL_PROCESSOR: this.env.MOZART_OTEL_PROCESSOR } : {}),
       },
     });
 
@@ -103,10 +101,7 @@ export class ProcessManagerService {
 
   awaitAllReady(timeoutMs: number): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error(`nodes not ready within ${timeoutMs}ms`)),
-        timeoutMs,
-      );
+      const timer = setTimeout(() => reject(new Error(`nodes not ready within ${timeoutMs}ms`)), timeoutMs);
       this.readyCheck = () => {
         if (this.ready.size >= coordinatorIds(this.scenario).length) {
           clearTimeout(timer);

@@ -15,10 +15,9 @@ async function bootstrap(): Promise<void> {
   const { SlaveModule } = await import('./app.module.js');
   const { ProtocolHostService } = await import('./protocol-host/protocol-host.service.js');
 
-  const app = await NestFactory.createApplicationContext(
-    SlaveModule.forNode({ nodeId, protocol, runId }),
-    { logger: ['warn', 'error'] },
-  );
+  const app = await NestFactory.createApplicationContext(SlaveModule.forNode({ nodeId, protocol, runId }), {
+    logger: ['warn', 'error'],
+  });
 
   // Graceful deactivate exits the process; ensure telemetry is flushed on exit.
   process.on('exit', () => void telemetry.shutdown());

@@ -32,10 +32,9 @@ async function bootstrap(): Promise<void> {
   const { AppModule } = await import('./app.module.js');
   const { RunService } = await import('./run/run.service.js');
 
-  const app = await NestFactory.createApplicationContext(
-    AppModule.forRun({ scenario, runId, env }),
-    { logger: ['log', 'warn', 'error'] },
-  );
+  const app = await NestFactory.createApplicationContext(AppModule.forRun({ scenario, runId, env }), {
+    logger: ['log', 'warn', 'error'],
+  });
 
   try {
     const summary = await app.get(RunService).run({ dryRun: values['dry-run'] });

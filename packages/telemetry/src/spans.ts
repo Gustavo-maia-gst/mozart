@@ -1,11 +1,11 @@
 import {
-  SpanKind,
-  SpanStatusCode,
-  trace,
   type Attributes,
   type Link,
   type Span,
+  SpanKind,
+  SpanStatusCode,
   type Tracer,
+  trace,
 } from '@opentelemetry/api';
 
 /** Mozart span/attribute keys (mixed with standard messaging.* where they exist). */

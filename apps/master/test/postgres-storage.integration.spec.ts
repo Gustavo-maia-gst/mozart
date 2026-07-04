@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { LatencyModel } from '@mozart/latency';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TimerScheduler } from '../src/clock/clock';
 import type { EventInput, EventLogService } from '../src/event-log/event-log.service';
 import { PostgresStorageAdapter } from '../src/storage/postgres.adapter';
-import { StorageGate } from '../src/storage/storage-gate';
 import { StorageService } from '../src/storage/storage.service';
+import { StorageGate } from '../src/storage/storage-gate';
 
 const enabled = process.env.MOZART_INTEGRATION === '1';
 const pgUrl = process.env.MOZART_PG_URL ?? 'postgres://mozart:mozart@localhost:5432/mozart';

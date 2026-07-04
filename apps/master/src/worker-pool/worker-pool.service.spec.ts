@@ -1,12 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { type Json, type NodeId, type Scenario, WORKER_NODE_ID, WORKER_TOPICS } from '@mozart/contracts';
 import { LatencyModel } from '@mozart/latency';
-import {
-  WORKER_NODE_ID,
-  WORKER_TOPICS,
-  type Json,
-  type NodeId,
-  type Scenario,
-} from '@mozart/contracts';
+import { beforeEach, describe, expect, it } from 'vitest';
 import type { CancelHandle, Clock, Scheduler } from '../clock/clock';
 import type { EventInput, EventLogService } from '../event-log/event-log.service';
 import type { TransportService } from '../transport/transport.service';

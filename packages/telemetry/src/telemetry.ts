@@ -1,4 +1,4 @@
-import { trace, type Tracer } from '@opentelemetry/api';
+import { type Tracer, trace } from '@opentelemetry/api';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import {
@@ -39,14 +39,10 @@ export interface Telemetry {
 export function initTelemetry(opts: InitTelemetryOptions): Telemetry {
   // `||` (not `??`): an empty string env/opt must fall through to the default,
   // otherwise the OTLP exporter throws on an invalid ('') URL.
-  const url =
-    opts.otlpUrl ||
-    process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ||
-    'http://localhost:4318/v1/traces';
+  const url = opts.otlpUrl || process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || 'http://localhost:4318/v1/traces';
 
   const exporter = new OTLPTraceExporter({ url });
-  const kind =
-    opts.processor ?? (process.env.MOZART_OTEL_PROCESSOR as 'simple' | undefined) ?? 'batch';
+  const kind = opts.processor ?? (process.env.MOZART_OTEL_PROCESSOR as 'simple' | undefined) ?? 'batch';
   const processor: SpanProcessor =
     kind === 'simple'
       ? new SimpleSpanProcessor(exporter)

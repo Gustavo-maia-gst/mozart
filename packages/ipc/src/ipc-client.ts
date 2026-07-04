@@ -1,7 +1,7 @@
 import type { IpcFrame, PushContracts, PushType, RpcContracts, RpcMethod } from '@mozart/contracts';
 import { IpcChannelClosedError, RpcRemoteError, RpcTimeoutError } from './errors';
-import { newFrame, type FrameChannel } from './frame-channel';
-import { resolveHooks, type IpcHooks } from './hooks';
+import { type FrameChannel, newFrame } from './frame-channel';
+import { type IpcHooks, resolveHooks } from './hooks';
 
 interface Pending {
   method: string;
@@ -10,9 +10,11 @@ interface Pending {
   timer?: NodeJS.Timeout;
 }
 
-export interface PushHandler {
-  <T extends PushType>(type: T, payload: PushContracts[T], frame: IpcFrame): void | Promise<void>;
-}
+export type PushHandler = <T extends PushType>(
+  type: T,
+  payload: PushContracts[T],
+  frame: IpcFrame,
+) => void | Promise<void>;
 
 export interface CallOptions {
   /**
@@ -105,9 +107,7 @@ export class IpcClient {
 
   private dispatchPush(frame: IpcFrame): void {
     if (!this.pushHandler || !frame.method) return;
-    void Promise.resolve(
-      this.pushHandler(frame.method as PushType, frame.payload as never, frame),
-    ).catch(() => {
+    void Promise.resolve(this.pushHandler(frame.method as PushType, frame.payload as never, frame)).catch(() => {
       // Push handlers own their own error semantics (e.g. no ack => redelivery).
     });
   }
