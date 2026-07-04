@@ -1,0 +1,633 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "title": "Mozart — Protocol scaling (vs node count)",
+  "uid": "mozart-scaling",
+  "tags": ["mozart"],
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "refresh": "",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0
+      },
+      {
+        "name": "scenario",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(mozart_messages_total, mozart_scenario)",
+          "refId": "sc"
+        },
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "current": {},
+        "label": "Scenario"
+      },
+      {
+        "name": "protocol",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_protocol)",
+          "refId": "p"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "label": "Protocol"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "How to read",
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Pick **one scenario** (same workload) and compare protocols as the **node count** grows. Each bar group is a node count on the x-axis; each colour is a protocol. Aggregated across every run at that (scenario, protocol, nodes) via `last_over_time` over the dashboard range. Note: the centralized **baseline** always collapses to 1 node, so it appears only at nodes=1."
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Mean makespan vs nodes (ms) — lower is better",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 3
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mozart_nodes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "displayName",
+                "value": "nodes"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "vertical",
+        "xTickLabelRotation": 0,
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom"
+        },
+        "xField": "mozart_nodes",
+        "stacking": "normal"
+      },
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "valueLabel": "mozart_protocol"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "mozart_nodes",
+                "destinationType": "number"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "mozart_nodes",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (mozart_nodes, mozart_protocol) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))) / sum by (mozart_nodes, mozart_protocol) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range])))",
+          "legendFormat": "__auto"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Coordination cost vs nodes (ms) — makespan − critical path",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 3
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mozart_nodes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "displayName",
+                "value": "nodes"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "vertical",
+        "xTickLabelRotation": 0,
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom"
+        },
+        "xField": "mozart_nodes",
+        "stacking": "normal"
+      },
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "valueLabel": "mozart_protocol"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "mozart_nodes",
+                "destinationType": "number"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "mozart_nodes",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "(sum by (mozart_nodes, mozart_protocol) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))) / sum by (mozart_nodes, mozart_protocol) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range])))) - (sum by (mozart_nodes, mozart_protocol) (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))) / sum by (mozart_nodes, mozart_protocol) (histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))))",
+          "legendFormat": "__auto"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Messages per completed task vs nodes — coordination chatter",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mozart_nodes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "displayName",
+                "value": "nodes"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "vertical",
+        "xTickLabelRotation": 0,
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom"
+        },
+        "xField": "mozart_nodes",
+        "stacking": "normal"
+      },
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "valueLabel": "mozart_protocol"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "mozart_nodes",
+                "destinationType": "number"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "mozart_nodes",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (mozart_nodes, mozart_protocol) (last_over_time(mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range])) / sum by (mozart_nodes, mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))",
+          "legendFormat": "__auto"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Storage ops per completed task vs nodes — contention proxy",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mozart_nodes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "displayName",
+                "value": "nodes"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "vertical",
+        "xTickLabelRotation": 0,
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom"
+        },
+        "xField": "mozart_nodes",
+        "stacking": "normal"
+      },
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "valueLabel": "mozart_protocol"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "mozart_nodes",
+                "destinationType": "number"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "mozart_nodes",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (mozart_nodes, mozart_protocol) (last_over_time(mozart_storage_ops_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range])) / sum by (mozart_nodes, mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))",
+          "legendFormat": "__auto"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Redelivery ratio vs nodes — redelivered / delivered",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mozart_nodes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "displayName",
+                "value": "nodes"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "vertical",
+        "xTickLabelRotation": 0,
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom"
+        },
+        "xField": "mozart_nodes",
+        "stacking": "normal"
+      },
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "valueLabel": "mozart_protocol"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "mozart_nodes",
+                "destinationType": "number"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "mozart_nodes",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (mozart_nodes, mozart_protocol) (last_over_time(mozart_messages_total{type=\"redelivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range])) / sum by (mozart_nodes, mozart_protocol) (last_over_time(mozart_messages_total{type=\"delivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))",
+          "legendFormat": "__auto"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Worker task duration p95 vs nodes (ms)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mozart_nodes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "displayName",
+                "value": "nodes"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "vertical",
+        "xTickLabelRotation": 0,
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom"
+        },
+        "xField": "mozart_nodes",
+        "stacking": "normal"
+      },
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "valueLabel": "mozart_protocol"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "mozart_nodes",
+                "destinationType": "number"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "mozart_nodes",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "histogram_quantile(0.95, sum by (mozart_nodes, mozart_protocol) (last_over_time(mozart_worker_task_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range])))",
+          "legendFormat": "__auto"
+        }
+      ]
+    }
+  ]
+}

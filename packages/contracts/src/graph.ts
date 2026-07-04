@@ -58,6 +58,31 @@ export function graphId(graph: Graph): GraphId {
 }
 
 /**
+ * Mean fan-in / fan-out across one or more DAGs.
+ *
+ * Averaging in-degree over *all* nodes equals averaging out-degree (both are
+ * edges/nodes), so that wouldn't tell the two apart. Instead we restrict each
+ * denominator to the nodes that actually have that kind of edge:
+ * - `meanFanIn`  = edges / (# nodes with ≥1 dependency)   → mean join width
+ * - `meanFanOut` = edges / (# nodes with ≥1 dependent)    → mean branch width
+ *
+ * Both are 0 for an edgeless graph. Aggregated across all graphs passed in.
+ */
+export function fanStats(graphs: Graph[]): { meanFanIn: number; meanFanOut: number } {
+  let edges = 0;
+  let withIn = 0;
+  let withOut = 0;
+  for (const graph of graphs) {
+    edges += graph.size;
+    graph.forEachNode((node) => {
+      if (graph.inDegree(node) > 0) withIn += 1;
+      if (graph.outDegree(node) > 0) withOut += 1;
+    });
+  }
+  return { meanFanIn: withIn ? edges / withIn : 0, meanFanOut: withOut ? edges / withOut : 0 };
+}
+
+/**
  * Critical-path cost of a DAG (ms): the maximum, over every path, of the sum of
  * each task's {@link TaskAttributes.costMs} (absent cost counts as 0). It is the
  * theoretical floor on the graph's makespan — the time to finish it with

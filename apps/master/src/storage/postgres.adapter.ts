@@ -39,11 +39,26 @@ export class PostgresStorageAdapter implements StorageAdapter {
   }
 
   public async find(query: StorageQuery): Promise<TaskMatch[]> {
-    // jsonb containment (@>) is attribute-equality for the given keys and can
-    // use a GIN index on data; an empty query contains everything.
+    // Scalar attributes go through jsonb containment (@>), which is
+    // attribute-equality and can use a GIN index on data. Array-valued
+    // attributes are IN filters: `data->>key = ANY(list)` (key/list are bound
+    // params, never interpolated). An empty query contains everything.
+    const containment: StorageQuery = {};
+    const conds: string[] = [];
+    const params: unknown[] = [];
+    for (const [key, value] of Object.entries(query)) {
+      if (Array.isArray(value)) {
+        params.push(key, value.map(String));
+        conds.push(`data ->> $${params.length - 1} = ANY($${params.length}::text[])`);
+      } else {
+        containment[key] = value;
+      }
+    }
+    params.push(containment);
+    conds.push(`data @> $${params.length}`);
     const r = await this.pool.query<{ task_id: TaskId; data: TaskState }>(
-      'select task_id, data from task_state where data @> $1',
-      [query],
+      `select task_id, data from task_state where ${conds.join(' and ')}`,
+      params,
     );
     return r.rows.map((row) => ({ taskId: row.task_id, data: row.data }));
   }

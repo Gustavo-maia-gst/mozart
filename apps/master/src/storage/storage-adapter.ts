@@ -2,9 +2,16 @@ import type { Json, StorageQuery, TaskId, TaskMatch, TaskState } from '@mozart/c
 
 export const STORAGE_ADAPTER = Symbol('STORAGE_ADAPTER');
 
-/** True iff `data` equals `query` on every listed attribute (empty ⇒ always). */
+/**
+ * True iff `data` matches `query` on every listed attribute (empty ⇒ always).
+ * A scalar value matches by equality; an **array** value matches by membership
+ * (an `IN` filter: `data[key]` must equal one of the elements) — so you can
+ * query, e.g., `{ taskId: [a, b, c], status: 'complete' }`.
+ */
 export function matchesQuery(data: TaskState, query: StorageQuery): boolean {
-  return Object.entries(query).every(([key, value]) => jsonEqual(data[key], value));
+  return Object.entries(query).every(([key, value]) =>
+    Array.isArray(value) ? value.some((v) => jsonEqual(data[key], v)) : jsonEqual(data[key], value),
+  );
 }
 
 /** Structural equality for JSON values (order-insensitive over object keys). */

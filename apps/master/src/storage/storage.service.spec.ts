@@ -116,4 +116,18 @@ describe('StorageService (in-memory)', () => {
     expect(await pending(service.read('n2', 't1'))).toBe(false); // n2 unaffected
     gate.end('n1');
   });
+
+  it('find: scalar attributes match by equality, array attributes by IN', async () => {
+    const { service } = ctx;
+    await service.save('n1', 'a', { taskId: 'a', status: 'complete' });
+    await service.save('n1', 'b', { taskId: 'b', status: 'complete' });
+    await service.save('n1', 'c', { taskId: 'c', status: 'pending' });
+
+    // IN on taskId, equality on status → only the complete ones among {a,b,c}.
+    const done = await service.find('n1', { taskId: ['a', 'b', 'c'], status: 'complete' });
+    expect(new Set(done.map((m) => m.taskId))).toEqual(new Set(['a', 'b']));
+
+    // An empty IN list matches nothing.
+    expect(await service.find('n1', { taskId: [] })).toHaveLength(0);
+  });
 });

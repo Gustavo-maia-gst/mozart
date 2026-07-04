@@ -37,6 +37,23 @@ describe('scenarioSchema', () => {
     expect(data.graphs[0]?.tasks[0]?.dependsOn).toEqual([]);
   });
 
+  it('expands a numeric node count into n<i>/node<Alpha> coordinators', () => {
+    const data = scenarioSchema.parse({
+      name: 'counted',
+      seed: 1,
+      protocol: 'pull',
+      nodes: 28,
+      graphs: [{ id: 'g0', tasks: [{ id: 't1' }] }],
+      storage: { adapter: 'in-memory' },
+      endCondition: { type: 'timeout', ms: 1000 },
+    });
+
+    expect(data.nodes[0]).toEqual({ id: 'n1', name: 'nodeA' });
+    expect(data.nodes[2]).toEqual({ id: 'n3', name: 'nodeC' });
+    expect(data.nodes[25]).toEqual({ id: 'n26', name: 'nodeZ' });
+    expect(data.nodes[27]).toEqual({ id: 'n28', name: 'nodeAB' }); // spreadsheet wrap
+  });
+
   it('rejects an unknown fault action', () => {
     expect(() =>
       scenarioSchema.parse({
@@ -81,5 +98,25 @@ describe('Scenario', () => {
     expect(scenario.coordinatorIds()).toEqual(['n1']);
     expect(scenario.nodeName('n1')).toBe('coordinator');
     expect(scenario.nodeName('unknown')).toBe('unknown'); // falls back to id
+  });
+
+  const multiNode = (protocol: string) =>
+    scenarioSchema.parse({
+      name: 'ns',
+      seed: 1,
+      protocol,
+      nodes: [{ id: 'n1' }, { id: 'n2' }, { id: 'n3' }],
+      graphs: [{ id: 'g0', tasks: [{ id: 'a' }] }],
+      storage: { adapter: 'in-memory' },
+      endCondition: { type: 'timeout', ms: 1000 },
+    });
+
+  it('collapses to a single coordinator for the centralized baseline', () => {
+    // Baseline keeps its frontier in memory, so extra declared nodes are ignored.
+    expect(new Scenario(multiNode('baseline')).coordinatorIds()).toEqual(['n1']);
+  });
+
+  it('keeps all declared coordinators for distributed protocols', () => {
+    expect(new Scenario(multiNode('topological-barrier')).coordinatorIds()).toEqual(['n1', 'n2', 'n3']);
   });
 });

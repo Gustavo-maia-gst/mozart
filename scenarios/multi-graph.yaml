@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=./scenario.schema.json
 # Bigger demo: one centralized coordinator driving THREE concurrent DAGs of
 # different shapes. Runtime task ids are namespaced per graph (g0-a, g1-x, ...),
 # so ids never collide across graphs. Nice for eyeballing the trace tree in
@@ -5,7 +6,7 @@
 name: multi-graph
 seed: 7
 protocol: baseline
-nodes: [{ id: n1, name: coordinator }]
+nodes: [{ id: n1, name: nodeA }, { id: n2, name: nodeB }, { id: n3, name: nodeC }]
 
 graphs:
   # g0 — diamond: a -> {b, c} -> d

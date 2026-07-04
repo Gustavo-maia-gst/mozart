@@ -12,9 +12,10 @@ export interface TaskMatch {
 }
 
 /**
- * Equality filter over stored task state: an AND of top-level `attribute ===
- * value` predicates. An empty query matches every task. Values are compared by
- * equality; intended for scalar attributes (`{ status: 'done' }`).
+ * Filter over stored task state: an AND of top-level predicates. An empty query
+ * matches every task. A scalar value matches by equality (`{ status: 'done' }`);
+ * an **array** value matches by membership — an `IN` filter, so
+ * `{ taskId: [a, b, c], status: 'done' }` selects the done tasks among a/b/c.
  */
 export type StorageQuery = JsonObject;
 
@@ -78,10 +79,10 @@ export abstract class StoragePort {
   public abstract save(taskId: TaskId, data: TaskState): Promise<void>;
 }
 
-export interface ExclusiveRead {
-  readonly data: TaskState | null;
+export interface ExclusiveRead<TTask = TaskState> {
+  readonly data: TTask | null;
   /** Commit new state and release the lock. */
-  save(data: TaskState): Promise<void>;
+  save(data: TTask): Promise<void>;
   /** Release the lock without writing (abort). */
   release(): Promise<void>;
 }

@@ -66,6 +66,28 @@
         "label": "Protocol"
       },
       {
+        "name": "nodes",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}, mozart_nodes)",
+          "refId": "n"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "sort": 3,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "label": "Nodes"
+      },
+      {
         "name": "comms",
         "type": "query",
         "datasource": {
@@ -118,12 +140,13 @@
         "w": 24,
         "x": 0,
         "y": 0
-      }
+      },
+      "id": 1
     },
     {
       "type": "bargauge",
       "title": "Coordination cost by protocol (ms)",
-      "description": "makespan − critical-path cost. The critical path is the max cost-weighted path through the DAG (Σ costMs); this is the pure overhead the protocol adds on top of the theoretical floor. Lower is better; ~0 means no coordination tax.",
+      "description": "makespan − critical-path cost: the overhead the protocol adds on top of the theoretical floor.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -147,10 +170,11 @@
         {
           "refId": "A",
           "instant": true,
-          "expr": "(sum by (mozart_protocol) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_protocol) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))) - (sum by (mozart_protocol) (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_protocol) (histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))))",
+          "expr": "(sum by (mozart_protocol) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_protocol) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))) - (sum by (mozart_protocol) (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_protocol) (histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))))",
           "legendFormat": "{{mozart_protocol}}"
         }
-      ]
+      ],
+      "id": 2
     },
     {
       "type": "bargauge",
@@ -178,10 +202,11 @@
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_protocol) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
+          "expr": "sum by (mozart_protocol) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_protocol) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
           "legendFormat": "{{mozart_protocol}}"
         }
-      ]
+      ],
+      "id": 3
     },
     {
       "type": "bargauge",
@@ -209,10 +234,11 @@
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (last_over_time(mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
           "legendFormat": "{{mozart_protocol}}"
         }
-      ]
+      ],
+      "id": 4
     },
     {
       "type": "bargauge",
@@ -240,10 +266,11 @@
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (last_over_time(mozart_storage_ops_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_storage_ops_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
           "legendFormat": "{{mozart_protocol}}"
         }
-      ]
+      ],
+      "id": 5
     },
     {
       "type": "row",
@@ -253,7 +280,8 @@
         "w": 24,
         "x": 0,
         "y": 9
-      }
+      },
+      "id": 6
     },
     {
       "type": "bargauge",
@@ -281,16 +309,17 @@
         {
           "refId": "p50",
           "instant": true,
-          "expr": "histogram_quantile(0.5, sum by (mozart_protocol) (last_over_time(mozart_worker_task_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
+          "expr": "histogram_quantile(0.5, sum by (mozart_protocol) (last_over_time(mozart_worker_task_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
           "legendFormat": "{{mozart_protocol}} p50"
         },
         {
           "refId": "p95",
           "instant": true,
-          "expr": "histogram_quantile(0.95, sum by (mozart_protocol) (last_over_time(mozart_worker_task_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
+          "expr": "histogram_quantile(0.95, sum by (mozart_protocol) (last_over_time(mozart_worker_task_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
           "legendFormat": "{{mozart_protocol}} p95"
         }
-      ]
+      ],
+      "id": 7
     },
     {
       "type": "bargauge",
@@ -318,16 +347,17 @@
         {
           "refId": "p50",
           "instant": true,
-          "expr": "histogram_quantile(0.5, sum by (mozart_protocol) (last_over_time(mozart_transport_deliver_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
+          "expr": "histogram_quantile(0.5, sum by (mozart_protocol) (last_over_time(mozart_transport_deliver_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
           "legendFormat": "{{mozart_protocol}} p50"
         },
         {
           "refId": "p95",
           "instant": true,
-          "expr": "histogram_quantile(0.95, sum by (mozart_protocol) (last_over_time(mozart_transport_deliver_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
+          "expr": "histogram_quantile(0.95, sum by (mozart_protocol) (last_over_time(mozart_transport_deliver_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
           "legendFormat": "{{mozart_protocol}} p95"
         }
-      ]
+      ],
+      "id": 8
     },
     {
       "type": "bargauge",
@@ -355,224 +385,1478 @@
         {
           "refId": "A",
           "instant": true,
-          "expr": "histogram_quantile(0.95, sum by (mozart_protocol, op) (last_over_time(mozart_storage_op_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
+          "expr": "histogram_quantile(0.95, sum by (mozart_protocol, op) (last_over_time(mozart_storage_op_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
           "legendFormat": "{{mozart_protocol}} / {{op}}"
         }
-      ]
+      ],
+      "id": 9
     },
     {
       "type": "row",
-      "title": "Fault behaviour & message mix",
+      "title": "Comparison — protocols × node count",
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 18
-      }
+      },
+      "id": 10
     },
     {
-      "type": "stat",
-      "title": "Redelivery ratio (redelivered / delivered)",
+      "type": "table",
+      "title": "Protocols × node count (respects all filters above)",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
+        "h": 9,
+        "w": 24,
         "x": 0,
         "y": 19
       },
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "orientation": "horizontal"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "instant": true,
-          "expr": "sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"redelivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"delivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
-          "legendFormat": "{{mozart_protocol}}"
-        }
-      ]
-    },
-    {
-      "type": "stat",
-      "title": "Duplication ratio (duplicated / delivered)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 19
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "orientation": "horizontal"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit"
-        }
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Nodes",
+            "desc": false
+          }
+        ]
       },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"duplicated\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"delivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
-          "legendFormat": "{{mozart_protocol}}"
-        }
-      ]
-    },
-    {
-      "type": "bargauge",
-      "title": "Messages by type",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 19
-      },
-      "options": {
-        "orientation": "horizontal",
-        "displayMode": "gradient"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        }
-      },
-      "targets": [
+          "format": "table",
+          "expr": "(sum by (mozart_protocol, mozart_nodes) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_protocol, mozart_nodes) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))))",
+          "legendFormat": ""
+        },
         {
-          "refId": "A",
+          "refId": "B",
           "instant": true,
-          "expr": "sum by (type) (last_over_time(mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
-          "legendFormat": "{{type}}"
+          "format": "table",
+          "expr": "(sum by (mozart_protocol, mozart_nodes) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_protocol, mozart_nodes) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))) - (sum by (mozart_protocol, mozart_nodes) (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_protocol, mozart_nodes) (histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "C",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (mozart_protocol, mozart_nodes) (last_over_time(mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol, mozart_nodes) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "D",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (mozart_protocol, mozart_nodes) (last_over_time(mozart_storage_ops_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol, mozart_nodes) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "E",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (mozart_protocol, mozart_nodes) (last_over_time(mozart_messages_total{type=\"redelivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol, mozart_nodes) (last_over_time(mozart_messages_total{type=\"delivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
         }
-      ]
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "mozart_protocol": "Protocol",
+              "Value #A": "Makespan (ms)",
+              "Value #B": "Coordination cost (ms)",
+              "Value #C": "Msgs / task",
+              "Value #D": "Storage ops / task",
+              "Value #E": "Redelivery ratio",
+              "mozart_nodes": "Nodes"
+            },
+            "indexByName": {
+              "mozart_protocol": 0,
+              "mozart_nodes": 1,
+              "Value #A": 2,
+              "Value #B": 3,
+              "Value #C": 4,
+              "Value #D": 5,
+              "Value #E": 6
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Makespan (ms)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Coordination cost (ms)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Redelivery ratio"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          }
+        ]
+      },
+      "id": 11
     },
     {
       "type": "row",
-      "title": "Duplicates: injected vs redundant worker-starts",
+      "title": "By node count (x = nodes, colour = protocol)",
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 27
-      }
+        "y": 28
+      },
+      "id": 12
     },
     {
-      "type": "stat",
-      "title": "Duplicated messages injected",
-      "description": "Extra copies the transport emitted (duplicateDeliveries fault).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 8,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mozart_nodes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "displayName",
+                "value": "nodes"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 29
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "mozart_nodes"
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "expr": "sum by (mozart_nodes, mozart_protocol) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_nodes, mozart_protocol) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
+          "instant": true,
+          "legendFormat": "__auto",
+          "refId": "A"
+        }
+      ],
+      "title": "Mean makespan vs nodes (ms)",
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "valueLabel": "mozart_protocol"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "mozart_nodes"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": false,
+                "field": "mozart_nodes"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "trend",
+      "id": 13
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 8,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mozart_nodes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "displayName",
+                "value": "nodes"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 29
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "mozart_nodes"
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "expr": "(sum by (mozart_nodes, mozart_protocol) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_nodes, mozart_protocol) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))) - (sum by (mozart_nodes, mozart_protocol) (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_nodes, mozart_protocol) (histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))))",
+          "instant": true,
+          "legendFormat": "__auto",
+          "refId": "A"
+        }
+      ],
+      "title": "Coordination cost vs nodes (ms)",
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "valueLabel": "mozart_protocol"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "mozart_nodes"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": false,
+                "field": "mozart_nodes"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "trend",
+      "id": 14
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 8,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mozart_nodes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "displayName",
+                "value": "nodes"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 38
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "mozart_nodes"
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "expr": "sum by (mozart_nodes, mozart_protocol) (last_over_time(mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_nodes, mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "instant": true,
+          "legendFormat": "__auto",
+          "refId": "A"
+        }
+      ],
+      "title": "Messages per completed task vs nodes",
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "valueLabel": "mozart_protocol"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "mozart_nodes"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": false,
+                "field": "mozart_nodes"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "trend",
+      "id": 15
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 8,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mozart_nodes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "displayName",
+                "value": "nodes"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 38
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "mozart_nodes"
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "expr": "sum by (mozart_nodes, mozart_protocol) (last_over_time(mozart_storage_ops_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_nodes, mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "instant": true,
+          "legendFormat": "__auto",
+          "refId": "A"
+        }
+      ],
+      "title": "Storage ops per completed task vs nodes",
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "valueLabel": "mozart_protocol"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "mozart_nodes"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": false,
+                "field": "mozart_nodes"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "trend",
+      "id": 16
+    },
+    {
+      "type": "row",
+      "title": "Cost vs fan-in (join width) — one line per protocol",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 47
+      },
+      "id": 17
+    },
+    {
+      "type": "trend",
+      "title": "Coordination cost (ms) vs fan-in",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
       "gridPos": {
-        "h": 8,
+        "h": 9,
         "w": 8,
         "x": 0,
-        "y": 28
+        "y": 48
       },
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "orientation": "horizontal"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        }
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom",
+          "displayMode": "list"
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "xField": "fan-in"
       },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"duplicated\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
-          "legendFormat": "{{mozart_protocol}}"
+          "format": "table",
+          "expr": "(sum by (mozart_fanin_mean) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_fanin_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_fanin_mean) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_fanin_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))) - (sum by (mozart_fanin_mean) (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_fanin_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_fanin_mean) (histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_fanin_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "B",
+          "instant": true,
+          "format": "table",
+          "expr": "(sum by (mozart_fanin_mean) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_fanin_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_fanin_mean) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_fanin_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))) - (sum by (mozart_fanin_mean) (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_fanin_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_fanin_mean) (histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_fanin_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "C",
+          "instant": true,
+          "format": "table",
+          "expr": "(sum by (mozart_fanin_mean) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_fanin_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_fanin_mean) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_fanin_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))) - (sum by (mozart_fanin_mean) (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_fanin_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_fanin_mean) (histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_fanin_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))))",
+          "legendFormat": ""
         }
-      ]
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "mozart_fanin_mean",
+                "destinationType": "number"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "mozart_fanin_mean",
+                "desc": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "mozart_fanin_mean": "fan-in",
+              "Value #A": "baseline",
+              "Value #B": "dependency-frontier",
+              "Value #C": "topological-barrier"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 7,
+            "showPoints": "always",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "fan-in"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "id": 18
     },
     {
-      "type": "stat",
-      "title": "Redundant worker-starts caught",
-      "description": "worker.duplicate-start: a duplicate/redelivery reached worker.start for an already-running task and the pool deduped it. Stays 0 for an idempotent protocol.",
+      "type": "trend",
+      "title": "Messages / task vs fan-in",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
       "gridPos": {
-        "h": 8,
+        "h": 9,
         "w": 8,
         "x": 8,
-        "y": 28
+        "y": 48
       },
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "orientation": "horizontal"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        }
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom",
+          "displayMode": "list"
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "xField": "fan-in"
       },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"duplicate-start\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
-          "legendFormat": "{{mozart_protocol}}"
+          "format": "table",
+          "expr": "sum by (mozart_fanin_mean) (last_over_time(mozart_messages_total{mozart_fanin_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_fanin_mean) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_fanin_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "B",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (mozart_fanin_mean) (last_over_time(mozart_messages_total{mozart_fanin_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_fanin_mean) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_fanin_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "C",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (mozart_fanin_mean) (last_over_time(mozart_messages_total{mozart_fanin_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_fanin_mean) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_fanin_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
         }
-      ]
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "mozart_fanin_mean",
+                "destinationType": "number"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "mozart_fanin_mean",
+                "desc": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "mozart_fanin_mean": "fan-in",
+              "Value #A": "baseline",
+              "Value #B": "dependency-frontier",
+              "Value #C": "topological-barrier"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 7,
+            "showPoints": "always",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "fan-in"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "id": 19
     },
     {
-      "type": "stat",
-      "title": "Redundant starts per duplicate (leakage)",
-      "description": "duplicate-start / duplicated. ~0 = the protocol absorbs duplicates; high = duplicates leak into redundant execution attempts.",
+      "type": "trend",
+      "title": "Storage ops / task vs fan-in",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
       "gridPos": {
-        "h": 8,
+        "h": 9,
         "w": 8,
         "x": 16,
-        "y": 28
+        "y": 48
       },
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "orientation": "horizontal"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit"
-        }
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom",
+          "displayMode": "list"
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "xField": "fan-in"
       },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"duplicate-start\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"duplicated\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
-          "legendFormat": "{{mozart_protocol}}"
+          "format": "table",
+          "expr": "sum by (mozart_fanin_mean) (last_over_time(mozart_storage_ops_total{mozart_fanin_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_fanin_mean) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_fanin_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "B",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (mozart_fanin_mean) (last_over_time(mozart_storage_ops_total{mozart_fanin_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_fanin_mean) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_fanin_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "C",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (mozart_fanin_mean) (last_over_time(mozart_storage_ops_total{mozart_fanin_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_fanin_mean) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_fanin_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
         }
-      ]
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "mozart_fanin_mean",
+                "destinationType": "number"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "mozart_fanin_mean",
+                "desc": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "mozart_fanin_mean": "fan-in",
+              "Value #A": "baseline",
+              "Value #B": "dependency-frontier",
+              "Value #C": "topological-barrier"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 7,
+            "showPoints": "always",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "fan-in"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "id": 20
+    },
+    {
+      "type": "row",
+      "title": "Cost vs fan-out (branch width) — one line per protocol",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 57
+      },
+      "id": 21
+    },
+    {
+      "type": "trend",
+      "title": "Coordination cost (ms) vs fan-out",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 0,
+        "y": 58
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom",
+          "displayMode": "list"
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "xField": "fan-out"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "format": "table",
+          "expr": "(sum by (mozart_fanout_mean) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_fanout_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_fanout_mean) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_fanout_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))) - (sum by (mozart_fanout_mean) (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_fanout_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_fanout_mean) (histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_fanout_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "B",
+          "instant": true,
+          "format": "table",
+          "expr": "(sum by (mozart_fanout_mean) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_fanout_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_fanout_mean) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_fanout_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))) - (sum by (mozart_fanout_mean) (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_fanout_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_fanout_mean) (histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_fanout_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "C",
+          "instant": true,
+          "format": "table",
+          "expr": "(sum by (mozart_fanout_mean) (histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_fanout_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_fanout_mean) (histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_fanout_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))) - (sum by (mozart_fanout_mean) (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_fanout_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))) / sum by (mozart_fanout_mean) (histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_fanout_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))))",
+          "legendFormat": ""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "mozart_fanout_mean",
+                "destinationType": "number"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "mozart_fanout_mean",
+                "desc": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "mozart_fanout_mean": "fan-out",
+              "Value #A": "baseline",
+              "Value #B": "dependency-frontier",
+              "Value #C": "topological-barrier"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 7,
+            "showPoints": "always",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "fan-out"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "id": 22
+    },
+    {
+      "type": "trend",
+      "title": "Messages / task vs fan-out",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 8,
+        "y": 58
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom",
+          "displayMode": "list"
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "xField": "fan-out"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (mozart_fanout_mean) (last_over_time(mozart_messages_total{mozart_fanout_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_fanout_mean) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_fanout_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "B",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (mozart_fanout_mean) (last_over_time(mozart_messages_total{mozart_fanout_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_fanout_mean) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_fanout_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "C",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (mozart_fanout_mean) (last_over_time(mozart_messages_total{mozart_fanout_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_fanout_mean) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_fanout_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "mozart_fanout_mean",
+                "destinationType": "number"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "mozart_fanout_mean",
+                "desc": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "mozart_fanout_mean": "fan-out",
+              "Value #A": "baseline",
+              "Value #B": "dependency-frontier",
+              "Value #C": "topological-barrier"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 7,
+            "showPoints": "always",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "fan-out"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "id": 23
+    },
+    {
+      "type": "trend",
+      "title": "Storage ops / task vs fan-out",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 58
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom",
+          "displayMode": "list"
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "xField": "fan-out"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (mozart_fanout_mean) (last_over_time(mozart_storage_ops_total{mozart_fanout_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_fanout_mean) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_fanout_mean!=\"\", mozart_protocol=\"baseline\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "B",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (mozart_fanout_mean) (last_over_time(mozart_storage_ops_total{mozart_fanout_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_fanout_mean) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_fanout_mean!=\"\", mozart_protocol=\"dependency-frontier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
+        },
+        {
+          "refId": "C",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (mozart_fanout_mean) (last_over_time(mozart_storage_ops_total{mozart_fanout_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])) / sum by (mozart_fanout_mean) (last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_fanout_mean!=\"\", mozart_protocol=\"topological-barrier\", mozart_scenario=~\"$scenario\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range]))",
+          "legendFormat": ""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "mozart_fanout_mean",
+                "destinationType": "number"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "mozart_fanout_mean",
+                "desc": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "mozart_fanout_mean": "fan-out",
+              "Value #A": "baseline",
+              "Value #B": "dependency-frontier",
+              "Value #C": "topological-barrier"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 7,
+            "showPoints": "always",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "fan-out"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "id": 24
     }
   ],
   "refresh": "10s"

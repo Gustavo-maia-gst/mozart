@@ -28,6 +28,33 @@ export const distributionSchema = z.discriminatedUnion('distribution', [
 export type DistributionConfig = z.infer<typeof distributionSchema>;
 
 const nodeIdSchema = z.string().min(1);
+
+/** 1 → "A", 26 → "Z", 27 → "AA" (spreadsheet-style column names). */
+function toAlpha(n: number): string {
+  let s = '';
+  for (let x = n; x > 0; x = Math.floor((x - 1) / 26)) {
+    s = String.fromCharCode(65 + ((x - 1) % 26)) + s;
+  }
+  return s;
+}
+
+const nodeObjSchema = z.object({ id: nodeIdSchema, name: z.string().min(1).optional() });
+
+/**
+ * Coordinators: either an explicit list, or just a count — in which case ids are
+ * `n1..nN` and names `nodeA..nodeZ..nodeAA` (so `nodes: 3` ≡
+ * `[{id: n1, name: nodeA}, {id: n2, name: nodeB}, {id: n3, name: nodeC}]`).
+ */
+const nodesSchema = z.union([
+  z.array(nodeObjSchema).min(1),
+  z
+    .number()
+    .int()
+    .positive()
+    .transform((count) =>
+      Array.from({ length: count }, (_, i) => ({ id: `n${i + 1}`, name: `node${toAlpha(i + 1)}` })),
+    ),
+]);
 const taskIdSchema = z.string().min(1);
 const graphIdSchema = z.string().min(1);
 
@@ -92,7 +119,7 @@ export const scenarioSchema = z.object({
   seed: z.union([z.string(), z.number()]).transform(String),
   protocol: z.string().min(1),
   /** Each coordinator's `name` drives its OTel service (defaults to `id`). */
-  nodes: z.array(z.object({ id: nodeIdSchema, name: z.string().min(1).optional() })).min(1),
+  nodes: nodesSchema,
   /** One or more concurrent DAGs to coordinate in this run. */
   graphs: z.array(graphSchema).min(1),
   storage: z.discriminatedUnion('adapter', [
@@ -197,9 +224,18 @@ export class Scenario {
     return this.data.graphs.map((g) => ({ graphId: g.id, startAfterMs: g.startAfterMs }));
   }
 
-  /** Coordinator node ids (the scenario's `nodes`, excluding the implicit W). */
+  /**
+   * Coordinator node ids (the scenario's `nodes`, excluding the implicit W).
+   *
+   * The centralized baseline keeps its frontier in memory in a single leader, so
+   * more than one coordinator would fork the state and break it. For that
+   * protocol we ignore the declared node count and collapse to a single
+   * coordinator — every consumer (spawn, ready-check, the peer list handed to
+   * slaves) routes through here, so the whole run sees just one.
+   */
   coordinatorIds(): string[] {
-    return this.data.nodes.map((n) => n.id);
+    const ids = this.data.nodes.map((n) => n.id);
+    return this.data.protocol === 'baseline' ? ids.slice(0, 1) : ids;
   }
 
   /** A coordinator's display name (drives its OTel service); defaults to its id. */

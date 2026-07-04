@@ -13,9 +13,9 @@ import {
 } from '@mozart/contracts';
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { TopologicalBarrierProtocol } from './topological_barrier';
+import { DependencyFrontierProtocol } from './dependency_frontier';
 
-// Diamond DAG: a -> {b, c} -> d. Topological orders: a=0, b=c=1, d=2.
+// Diamond DAG: a -> {b, c} -> d.
 const graph = buildGraph('g0', [
   { id: 'a' },
   { id: 'b', dependsOn: ['a'] },
@@ -23,15 +23,15 @@ const graph = buildGraph('g0', [
   { id: 'd', dependsOn: ['b', 'c'] },
 ]);
 
-/** In-memory S: equality-filter `find`, plus a trivial (non-blocking) exclusive read. */
+/** In-memory S with the same match rule as the real adapter (scalar = eq, array = IN). */
 const store = new Map<string, TaskState>();
+const matches = (data: TaskState, query: StorageQuery): boolean =>
+  Object.entries(query).every(([k, v]) => (Array.isArray(v) ? v.includes(data[k] as never) : data[k] === v));
 const fakeStorage: StoragePort = {
   read: (id) => Promise.resolve(store.get(id) ?? null),
   find: (query: StorageQuery) => {
     const hits: TaskMatch[] = [];
-    for (const [taskId, data] of store) {
-      if (Object.entries(query).every(([k, v]) => data[k] === v)) hits.push({ taskId, data });
-    }
+    for (const [taskId, data] of store) if (matches(data, query)) hits.push({ taskId, data });
     return Promise.resolve(hits);
   },
   save: (id, data) => {
@@ -49,107 +49,92 @@ const fakeStorage: StoragePort = {
     }),
 };
 
-// Record dispatches to W and coordinator messages so tests can assert ordering.
 const started: string[] = [];
-const messages: { topic: string; body: unknown }[] = [];
 let completedGraph: string | undefined;
 const fakeTransport: TransportPort = {
   sendToWorkerPool: (t) => {
     started.push(t);
     return Promise.resolve();
   },
-  sendToCoordinators: (topic, body) => {
-    messages.push({ topic, body });
-    return Promise.resolve();
-  },
+  sendToCoordinators: () => Promise.resolve(),
   completeGraph: (id) => {
     completedGraph = id;
     return Promise.resolve();
   },
 };
 
-async function makeProtocol(): Promise<TopologicalBarrierProtocol> {
+async function makeProtocol(): Promise<DependencyFrontierProtocol> {
   const moduleRef = await Test.createTestingModule({
     providers: [
-      TopologicalBarrierProtocol,
+      DependencyFrontierProtocol,
       { provide: StoragePort, useValue: fakeStorage },
       { provide: TransportPort, useValue: fakeTransport },
       { provide: ProtocolLogger, useValue: { debug() {}, info() {}, warn() {}, error() {} } },
     ],
   }).compile();
-  return moduleRef.get(TopologicalBarrierProtocol);
+  return moduleRef.get(DependencyFrontierProtocol);
 }
 
 const success = (taskId: string): WorkerSuccessEvent => ({ taskId });
 const fail = (taskId: string): WorkerFailEvent => ({ taskId });
-const advance = (body: unknown): Message => ({ topic: 'barrier.advance', body });
 
-/** Drain queued advance messages back into the protocol (what the transport would deliver). */
-async function pump(p: TopologicalBarrierProtocol): Promise<void> {
-  for (const m of messages.splice(0)) await p.onMessage(advance(m.body));
-}
-
-describe('TopologicalBarrierProtocol', () => {
+describe('DependencyFrontierProtocol', () => {
   beforeEach(() => {
     store.clear();
     started.length = 0;
-    messages.length = 0;
     completedGraph = undefined;
   });
 
-  it('persists each task with its topological order', async () => {
+  it('persists each task with its edges (deps / dependents)', async () => {
     const p = await makeProtocol();
     await p.persistGraph(graph);
-    expect(store.get('a')).toEqual({ kind: 'task', graphId: 'g0', order: 0, status: 'pending' });
-    expect(store.get('b')).toMatchObject({ order: 1 });
-    expect(store.get('c')).toMatchObject({ order: 1 });
-    expect(store.get('d')).toMatchObject({ order: 2 });
+    expect(store.get('a')).toMatchObject({ kind: 'task', deps: [], dependents: ['b', 'c'], depCount: 0 });
+    expect(store.get('d')).toMatchObject({ deps: ['b', 'c'], dependents: [], depCount: 2 });
   });
 
-  it('starts only order 0, then advances a whole level at a time', async () => {
+  it('starts only the roots', async () => {
     const p = await makeProtocol();
     await p.persistGraph(graph);
     await p.startGraph('g0');
-    expect(started).toEqual(['a']); // only the root level
+    expect(started).toEqual(['a']);
+  });
 
-    await p.onWorkerSuccess(success('a')); // order 0 done → advance to order 1
-    await pump(p);
-    expect(started).toEqual(['a', 'b', 'c']); // both order-1 tasks start together
+  it('advances the exact frontier: a starts b and c; d waits for both', async () => {
+    const p = await makeProtocol();
+    await p.persistGraph(graph);
+    await p.startGraph('g0');
 
-    await p.onWorkerSuccess(success('b')); // order 1 not done yet (c pending)
-    await pump(p);
-    expect(started).toEqual(['a', 'b', 'c']); // barrier holds d back
-
-    await p.onWorkerSuccess(success('c')); // order 1 complete → advance to order 2
-    await pump(p);
+    await p.onWorkerSuccess(success('a')); // unlocks b and c
+    expect(started).toEqual(['a', 'b', 'c']);
+    await p.onWorkerSuccess(success('b')); // d still needs c
+    expect(started).toEqual(['a', 'b', 'c']);
+    await p.onWorkerSuccess(success('c')); // now d's deps are all complete
     expect(started).toEqual(['a', 'b', 'c', 'd']);
   });
 
-  it('completes the graph exactly once after the last order', async () => {
+  it('completes the graph once the last (leaf) task finishes', async () => {
     const p = await makeProtocol();
     await p.persistGraph(graph);
     await p.startGraph('g0');
     await p.onWorkerSuccess(success('a'));
-    await pump(p);
     await p.onWorkerSuccess(success('b'));
     await p.onWorkerSuccess(success('c'));
-    await pump(p);
-    await p.onWorkerSuccess(success('d')); // last order done → advance to empty order 3
-    await pump(p);
+    expect(completedGraph).toBeUndefined(); // d not done yet
+    await p.onWorkerSuccess(success('d'));
     expect(completedGraph).toBe('g0');
   });
 
-  it('is idempotent under a duplicated completion: never starts the next order early', async () => {
+  it('is idempotent: a duplicated completion never starts a task with unmet deps', async () => {
     const p = await makeProtocol();
     await p.persistGraph(graph);
     await p.startGraph('g0');
     await p.onWorkerSuccess(success('a'));
-    await p.onWorkerSuccess(success('a')); // duplicate / redelivery re-drives the barrier
-    await pump(p);
-    // A duplicate re-dispatches the already-running order-1 tasks (W dedupes
-    // those), but the barrier still holds d back: order 2 never starts early.
-    expect(new Set(started)).toEqual(new Set(['a', 'b', 'c']));
+    await p.onWorkerSuccess(success('a')); // duplicate / redelivery
+    await p.onWorkerSuccess(success('b'));
+    await p.onWorkerSuccess(success('b')); // duplicate
+    // d only ever starts after BOTH b and c complete — never from a duplicate.
     expect(started).not.toContain('d');
+    expect(new Set(started)).toEqual(new Set(['a', 'b', 'c']));
   });
 
   it('retries a failed task by re-dispatching it', async () => {

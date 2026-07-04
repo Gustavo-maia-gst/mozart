@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { parseArgs } from 'node:util';
+import { fanStats } from '@mozart/contracts';
 import { initTelemetry } from '@mozart/telemetry';
 import { loadEnv } from './config/env';
 import { latencyResourceAttrs } from './metrics/resource-attrs';
@@ -24,9 +25,19 @@ async function bootstrap(): Promise<void> {
     options: {
       protocol: { type: 'string', short: 'p' },
       scenario: { type: 'string', short: 's' },
+      nodes: { type: 'string', short: 'n' },
       'dry-run': { type: 'boolean', default: false },
     },
   });
+
+  // Optional node-count override (e.g. `--nodes 5`) for scaling sweeps.
+  let nodes: number | undefined;
+  if (values.nodes !== undefined) {
+    nodes = Number(values.nodes);
+    if (!Number.isInteger(nodes) || nodes < 1) {
+      throw new Error(`--nodes must be a positive integer, got "${values.nodes}"`);
+    }
+  }
 
   // Accept `master <protocol> [scenario]` positionally, or the equivalent
   // `--protocol`/`--scenario` flags. The scenario defaults to the protocol's
@@ -35,12 +46,13 @@ async function bootstrap(): Promise<void> {
   const scenarioArg = values.scenario ?? positionals[1];
   const scenarioPath = resolveScenarioPath(scenarioArg, protocol);
   if (!scenarioPath) {
-    throw new Error('usage: master <protocol> [scenario] | --scenario <path.yaml> [--dry-run]');
+    throw new Error('usage: master <protocol> [scenario] | --scenario <path.yaml> [--nodes N] [--dry-run]');
   }
 
   const env = loadEnv();
-  const scenario = loadScenario(scenarioPath, protocol);
+  const scenario = loadScenario(scenarioPath, { protocol, nodes });
   const runId = `${scenario.name}-${randomUUID().slice(0, 8)}`;
+  const { meanFanIn: fanIn, meanFanOut: fanOut } = fanStats(scenario.graphs);
 
   // Telemetry first: instrumentation must patch libraries before the app graph
   // (which pulls in pg) is imported.
@@ -54,6 +66,11 @@ async function bootstrap(): Promise<void> {
       'mozart.protocol': scenario.protocol,
       'mozart.scenario': scenario.name,
       'mozart.seed': scenario.seed,
+      // Effective coordinator count (baseline collapses to 1) — the scaling axis.
+      'mozart.nodes': String(scenario.coordinatorIds().length),
+      // Mean join/branch width of the DAGs — the fan-in/fan-out sweep axes.
+      'mozart.fanin.mean': fanIn.toFixed(2),
+      'mozart.fanout.mean': fanOut.toFixed(2),
       ...latencyResourceAttrs(scenario.latency),
     },
     otlpUrl: env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,

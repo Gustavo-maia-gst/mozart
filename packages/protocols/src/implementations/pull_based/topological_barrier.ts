@@ -1,4 +1,5 @@
 import {
+  ExclusiveRead,
   type Graph,
   type GraphId,
   graphId as idOf,
@@ -82,6 +83,49 @@ export class TopologicalBarrierProtocol extends Protocol {
     await this.startOrder(graphId, order);
   }
 
+  /**
+   * Dispatch every not-yet-complete task at `order`. An order with no tasks is
+   * the terminator: the previous level was the last one, so the graph is done.
+   * Idempotent: only pending→running transitions write, and W dedupes a
+   * duplicate start, so a redelivered advance never double-runs or clobbers a
+   * completion.
+   */
+  private async startOrder(graphId: GraphId, order: number): Promise<void> {
+    const tasks = await this.storage.find({ kind: TASK_KIND, graphId, order });
+    if (tasks.length > 0) {
+      await Promise.all(
+        tasks.map(async ({ taskId }) => {
+          await this.dispatch(taskId);
+        }),
+      );
+      return;
+    }
+    // no task in the last order, finish the graph
+    const ex = (await this.storage.readExclusive(`meta-${graphId}`)) as ExclusiveRead<MetaRecord>;
+    if (ex.data?.completed) {
+      await ex.release();
+      return;
+    }
+    await ex.save({ kind: META_KIND, graphId, completed: true });
+    this.log.info('graph complete', { graphId });
+    await this.transport.completeGraph(graphId);
+    return;
+  }
+
+  /** Move a task pending→running (under lock, never clobbering complete) and send it to W. */
+  private async dispatch(taskId: TaskId): Promise<void> {
+    const ex = await this.storage.readExclusive(taskId);
+    const record = ex.data as TaskRecord | null;
+    if (!record || record.status === 'complete') {
+      await ex.release();
+      return;
+    }
+    if (record.status === 'pending') await ex.save({ ...record, status: 'running' });
+    else await ex.release(); // already running — re-dispatch below to re-drive liveness
+    this.log.info('start task', { taskId });
+    await this.transport.sendToWorkerPool(taskId);
+  }
+
   /** A task finished: mark it complete, then re-check its order's barrier. */
   public override async onWorkerSuccess(event: WorkerSuccessEvent): Promise<void> {
     const ex = await this.storage.readExclusive(event.taskId);
@@ -104,36 +148,6 @@ export class TopologicalBarrierProtocol extends Protocol {
     await this.transport.sendToWorkerPool(event.taskId);
   }
 
-  /**
-   * Dispatch every not-yet-complete task at `order`. An order with no tasks is
-   * the terminator: the previous level was the last one, so the graph is done.
-   * Idempotent: only pending→running transitions write, and W dedupes a
-   * duplicate start, so a redelivered advance never double-runs or clobbers a
-   * completion.
-   */
-  private async startOrder(graphId: GraphId, order: number): Promise<void> {
-    const tasks = await this.storage.find({ kind: TASK_KIND, graphId, order });
-    if (tasks.length === 0) {
-      await this.finishGraph(graphId);
-      return;
-    }
-    for (const { taskId } of tasks) await this.dispatch(taskId);
-  }
-
-  /** Move a task pending→running (under lock, never clobbering complete) and send it to W. */
-  private async dispatch(taskId: TaskId): Promise<void> {
-    const ex = await this.storage.readExclusive(taskId);
-    const record = ex.data as TaskRecord | null;
-    if (!record || record.status === 'complete') {
-      await ex.release();
-      return;
-    }
-    if (record.status === 'pending') await ex.save({ ...record, status: 'running' });
-    else await ex.release(); // already running — re-dispatch below to re-drive liveness
-    this.log.info('start task', { taskId });
-    await this.transport.sendToWorkerPool(taskId);
-  }
-
   /** If the whole order has completed, message the coordinators to start the next one. */
   private async checkBarrier(graphId: GraphId, order: number): Promise<void> {
     const tasks = await this.storage.find({ kind: TASK_KIND, graphId, order });
@@ -143,24 +157,35 @@ export class TopologicalBarrierProtocol extends Protocol {
     await this.transport.sendToCoordinators(ADVANCE_TOPIC, { graphId, order: order + 1 } satisfies AdvanceBody);
   }
 
-  /** Signal end-of-graph to the harness exactly once, guarded by the meta record. */
-  private async finishGraph(graphId: GraphId): Promise<void> {
-    const ex = await this.storage.readExclusive(this.metaKey(graphId));
-    if ((ex.data as MetaRecord | null)?.completed) {
-      await ex.release();
-      return;
-    }
-    await ex.save({ kind: META_KIND, graphId, completed: true } satisfies MetaRecord);
-    this.log.info('graph complete', { graphId });
-    await this.transport.completeGraph(graphId);
-  }
-
-  private metaKey(graphId: GraphId): string {
-    return `barrier-meta:${graphId}`;
-  }
-
   /** Persist every task with its topological order (the one place order is computed). */
   public override async persistGraph(graph: Graph): Promise<void> {
+    function topologicalOrders(graph: Graph): Map<TaskId, number> {
+      const order = new Map<TaskId, number>();
+      const indegree = new Map<TaskId, number>();
+
+      const ready: TaskId[] = [];
+      graph.forEachNode((node) => {
+        const deg = graph.inDegree(node);
+        indegree.set(node, deg);
+        if (deg === 0) {
+          order.set(node, 0);
+          ready.push(node);
+        }
+      });
+
+      while (ready.length > 0) {
+        const node = ready.shift() as TaskId;
+        const level = order.get(node) ?? 0;
+        for (const next of graph.outNeighbors(node)) {
+          order.set(next, Math.max(order.get(next) ?? 0, level + 1));
+          const deg = (indegree.get(next) ?? 1) - 1;
+          indegree.set(next, deg);
+          if (deg === 0) ready.push(next);
+        }
+      }
+      return order;
+    }
+
     const gid = idOf(graph);
     const orders = topologicalOrders(graph);
     for (const [taskId, order] of orders) {
@@ -169,35 +194,4 @@ export class TopologicalBarrierProtocol extends Protocol {
     }
     this.log.info('graph persisted', { graphId: gid, tasks: graph.order });
   }
-}
-
-/**
- * Longest-path level per node (Kahn's algorithm): roots are 0, and every task
- * sits one past its deepest dependency. This is the barrier order — a task at
- * level k has all its dependencies at levels < k, so a per-level barrier never
- * starts a task before its dependencies.
- */
-function topologicalOrders(graph: Graph): Map<TaskId, number> {
-  const order = new Map<TaskId, number>();
-  const indegree = new Map<TaskId, number>();
-  const ready: TaskId[] = [];
-  graph.forEachNode((node) => {
-    const deg = graph.inDegree(node);
-    indegree.set(node, deg);
-    if (deg === 0) {
-      order.set(node, 0);
-      ready.push(node);
-    }
-  });
-  while (ready.length > 0) {
-    const node = ready.shift() as TaskId;
-    const level = order.get(node) ?? 0;
-    for (const next of graph.outNeighbors(node)) {
-      order.set(next, Math.max(order.get(next) ?? 0, level + 1));
-      const deg = (indegree.get(next) ?? 1) - 1;
-      indegree.set(next, deg);
-      if (deg === 0) ready.push(next);
-    }
-  }
-  return order;
 }

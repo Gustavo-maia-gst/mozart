@@ -1,5 +1,6 @@
 import type { Type } from '@nestjs/common';
 import { BaselineProtocol } from './implementations/baseline/baseline';
+import { DependencyFrontierProtocol } from './implementations/pull_based/dependency_frontier';
 import { TopologicalBarrierProtocol } from './implementations/pull_based/topological_barrier';
 import type { Protocol } from './protocol';
 
@@ -7,6 +8,7 @@ import type { Protocol } from './protocol';
 export const PROTOCOLS: Record<string, Type<Protocol>> = {
   baseline: BaselineProtocol,
   'topological-barrier': TopologicalBarrierProtocol,
+  'dependency-frontier': DependencyFrontierProtocol,
 };
 
 export function resolveProtocol(name: string): Type<Protocol> {

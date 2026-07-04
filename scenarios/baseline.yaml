@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=./scenario.schema.json
 # Centralized baseline over a diamond DAG: a -> {b, c} -> d.
 # One coordinator loads the graph into memory and drives it from completions.
 name: baseline

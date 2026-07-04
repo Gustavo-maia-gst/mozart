@@ -4,11 +4,11 @@
 name: calculos_mensais_v2-19412-scaled
 seed: 1783186375003
 protocol: baseline
-nodes: [{ id: n1, name: coordinator }]
+nodes: [{ id: n1, name: nodeA }, { id: n2, name: nodeB }, { id: n3, name: nodeC }]
 storage: { adapter: in-memory }
 transport: { ackTimeoutMs: 2000 }
 latency:
-  transport.deliver: { distribution: normal, mean: 15, stddev: 5 }
+  transport.deliver: { distribution: constant, value: 5 }
   storage.read: { distribution: constant, value: 5 }
   storage.save: { distribution: constant, value: 5 }
 endCondition: { type: timeout, ms: 60000 }

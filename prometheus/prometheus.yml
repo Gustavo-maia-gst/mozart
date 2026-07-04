@@ -15,6 +15,9 @@ otlp:
     - mozart.run_id
     - mozart.scenario
     - mozart.seed
+    - mozart.nodes
+    - mozart.fanin.mean
+    - mozart.fanout.mean
     - mozart.latency.transport_deliver.mean
     - mozart.latency.transport_deliver.stddev
     - mozart.latency.storage_read.mean

@@ -26,7 +26,10 @@
         "name": "protocol",
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "query": { "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_protocol)", "refId": "p" },
+        "query": {
+          "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_protocol)",
+          "refId": "p"
+        },
         "refresh": 2,
         "includeAll": true,
         "multi": false,
@@ -37,7 +40,10 @@
         "name": "run",
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "query": { "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}, mozart_run_id)", "refId": "r" },
+        "query": {
+          "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}, mozart_run_id)",
+          "refId": "r"
+        },
         "refresh": 2,
         "sort": 5,
         "includeAll": false,
@@ -64,7 +70,11 @@
       "fieldConfig": { "defaults": { "unit": "ms" } },
       "options": { "colorMode": "value", "graphMode": "none" },
       "targets": [
-        { "refId": "A", "instant": true, "expr": "histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}[$__range])) / histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}[$__range]))" }
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}[$__range])) / histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}[$__range]))"
+        }
       ]
     },
     {
@@ -76,7 +86,11 @@
       "fieldConfig": { "defaults": { "unit": "ms" } },
       "options": { "colorMode": "value", "graphMode": "none" },
       "targets": [
-        { "refId": "A", "instant": true, "expr": "histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_run_id=\"$run\"}[$__range])) / histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_run_id=\"$run\"}[$__range]))" }
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_run_id=\"$run\"}[$__range])) / histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_run_id=\"$run\"}[$__range]))"
+        }
       ]
     },
     {
@@ -88,7 +102,11 @@
       "fieldConfig": { "defaults": { "unit": "ms" } },
       "options": { "colorMode": "value", "graphMode": "none" },
       "targets": [
-        { "refId": "A", "instant": true, "expr": "(histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}[$__range])) / histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}[$__range]))) - (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_run_id=\"$run\"}[$__range])) / histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_run_id=\"$run\"}[$__range])))" }
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "(histogram_sum(last_over_time(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}[$__range])) / histogram_count(last_over_time(mozart_dag_makespan_milliseconds{mozart_run_id=\"$run\"}[$__range]))) - (histogram_sum(last_over_time(mozart_dag_critical_path_milliseconds{mozart_run_id=\"$run\"}[$__range])) / histogram_count(last_over_time(mozart_dag_critical_path_milliseconds{mozart_run_id=\"$run\"}[$__range])))"
+        }
       ]
     },
     {
@@ -99,7 +117,11 @@
       "fieldConfig": { "defaults": { "unit": "short" } },
       "options": { "colorMode": "value", "graphMode": "none" },
       "targets": [
-        { "refId": "A", "instant": true, "expr": "sum(last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_run_id=\"$run\"}[$__range]))" }
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum(last_over_time(mozart_worker_tasks_total{outcome=\"completed\", mozart_run_id=\"$run\"}[$__range]))"
+        }
       ]
     },
     {
@@ -107,10 +129,19 @@
       "title": "Tasks failed",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 5, "w": 5, "x": 19, "y": 1 },
-      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        }
+      },
       "options": { "colorMode": "value", "graphMode": "none" },
       "targets": [
-        { "refId": "A", "instant": true, "expr": "sum(last_over_time(mozart_worker_tasks_total{outcome=\"failed\", mozart_run_id=\"$run\"}[$__range]))" }
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum(last_over_time(mozart_worker_tasks_total{outcome=\"failed\", mozart_run_id=\"$run\"}[$__range]))"
+        }
       ]
     },
     { "type": "row", "title": "Message & storage mix", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 } },
@@ -122,7 +153,12 @@
       "options": { "orientation": "horizontal", "displayMode": "gradient" },
       "fieldConfig": { "defaults": { "unit": "short" } },
       "targets": [
-        { "refId": "A", "instant": true, "expr": "sum by (type) (last_over_time(mozart_messages_total{mozart_run_id=\"$run\"}[$__range]))", "legendFormat": "{{type}}" }
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (type) (last_over_time(mozart_messages_total{mozart_run_id=\"$run\"}[$__range]))",
+          "legendFormat": "{{type}}"
+        }
       ]
     },
     {
@@ -133,7 +169,12 @@
       "options": { "orientation": "horizontal", "displayMode": "gradient" },
       "fieldConfig": { "defaults": { "unit": "short" } },
       "targets": [
-        { "refId": "A", "instant": true, "expr": "sum by (op) (last_over_time(mozart_storage_ops_total{mozart_run_id=\"$run\"}[$__range]))", "legendFormat": "{{op}}" }
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (op) (last_over_time(mozart_storage_ops_total{mozart_run_id=\"$run\"}[$__range]))",
+          "legendFormat": "{{op}}"
+        }
       ]
     },
     {
@@ -144,7 +185,11 @@
       "fieldConfig": { "defaults": { "unit": "percentunit" } },
       "options": { "colorMode": "value", "graphMode": "none" },
       "targets": [
-        { "refId": "A", "instant": true, "expr": "sum(last_over_time(mozart_messages_total{type=\"redelivered\", mozart_run_id=\"$run\"}[$__range])) / sum(last_over_time(mozart_messages_total{type=\"delivered\", mozart_run_id=\"$run\"}[$__range]))" }
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum(last_over_time(mozart_messages_total{type=\"redelivered\", mozart_run_id=\"$run\"}[$__range])) / sum(last_over_time(mozart_messages_total{type=\"delivered\", mozart_run_id=\"$run\"}[$__range]))"
+        }
       ]
     },
     {
@@ -156,7 +201,11 @@
       "fieldConfig": { "defaults": { "unit": "short" } },
       "options": { "colorMode": "value", "graphMode": "none" },
       "targets": [
-        { "refId": "A", "instant": true, "expr": "sum(last_over_time(mozart_worker_tasks_total{outcome=\"duplicate-start\", mozart_run_id=\"$run\"}[$__range]))" }
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum(last_over_time(mozart_worker_tasks_total{outcome=\"duplicate-start\", mozart_run_id=\"$run\"}[$__range]))"
+        }
       ]
     },
     { "type": "row", "title": "Latency distribution (whole run)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 } },
@@ -168,9 +217,24 @@
       "options": { "orientation": "horizontal", "displayMode": "gradient" },
       "fieldConfig": { "defaults": { "unit": "ms" } },
       "targets": [
-        { "refId": "p50", "instant": true, "expr": "histogram_quantile(0.5, sum(last_over_time(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}[$__range])))", "legendFormat": "p50" },
-        { "refId": "p90", "instant": true, "expr": "histogram_quantile(0.9, sum(last_over_time(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}[$__range])))", "legendFormat": "p90" },
-        { "refId": "p99", "instant": true, "expr": "histogram_quantile(0.99, sum(last_over_time(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}[$__range])))", "legendFormat": "p99" }
+        {
+          "refId": "p50",
+          "instant": true,
+          "expr": "histogram_quantile(0.5, sum(last_over_time(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}[$__range])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "p90",
+          "instant": true,
+          "expr": "histogram_quantile(0.9, sum(last_over_time(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}[$__range])))",
+          "legendFormat": "p90"
+        },
+        {
+          "refId": "p99",
+          "instant": true,
+          "expr": "histogram_quantile(0.99, sum(last_over_time(mozart_worker_task_duration_milliseconds{mozart_run_id=\"$run\"}[$__range])))",
+          "legendFormat": "p99"
+        }
       ]
     },
     {
@@ -181,19 +245,31 @@
       "options": { "orientation": "horizontal", "displayMode": "gradient" },
       "fieldConfig": { "defaults": { "unit": "ms" } },
       "targets": [
-        { "refId": "ack", "instant": true, "expr": "histogram_quantile(0.95, sum(last_over_time(mozart_transport_ack_latency_milliseconds{mozart_run_id=\"$run\"}[$__range])))", "legendFormat": "ack p95" },
-        { "refId": "lock", "instant": true, "expr": "histogram_quantile(0.95, sum(last_over_time(mozart_storage_lock_wait_milliseconds{mozart_run_id=\"$run\"}[$__range])))", "legendFormat": "lock wait p95" }
+        {
+          "refId": "ack",
+          "instant": true,
+          "expr": "histogram_quantile(0.95, sum(last_over_time(mozart_transport_ack_latency_milliseconds{mozart_run_id=\"$run\"}[$__range])))",
+          "legendFormat": "ack p95"
+        },
+        {
+          "refId": "lock",
+          "instant": true,
+          "expr": "histogram_quantile(0.95, sum(last_over_time(mozart_storage_lock_wait_milliseconds{mozart_run_id=\"$run\"}[$__range])))",
+          "legendFormat": "lock wait p95"
+        }
       ]
     },
-    { "type": "row", "title": "Traces (Jaeger) — the run's timeline lives here", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 } },
+    {
+      "type": "row",
+      "title": "Traces (Jaeger) — the run's timeline lives here",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 }
+    },
     {
       "type": "traces",
       "title": "Recent traces — set the $service variable (coordinator name)",
       "datasource": { "type": "jaeger", "uid": "mozart-jaeger" },
       "gridPos": { "h": 12, "w": 24, "x": 0, "y": 25 },
-      "targets": [
-        { "refId": "A", "queryType": "search", "service": "$service", "limit": 20 }
-      ]
+      "targets": [{ "refId": "A", "queryType": "search", "service": "$service", "limit": 20 }]
     }
   ]
 }
