@@ -1,6 +1,6 @@
-import { type Delivery, type Graph, PROTOCOL, type PushType, type ScenarioInfo } from '@mozart/contracts';
+import { type Delivery, type Graph, type PushType, type ScenarioInfo } from '@mozart/contracts';
 import type { IpcClient } from '@mozart/ipc';
-import type { Protocol } from '@mozart/protocols';
+import { Protocol } from '@mozart/protocols';
 import {
   annotateSpan,
   ATTR,
@@ -35,7 +35,7 @@ export class ProtocolHostService {
   constructor(
     @Inject(IPC_CLIENT) private readonly ipc: IpcClient,
     @Inject(NODE_ID) private readonly nodeId: string,
-    @Inject(PROTOCOL) private readonly protocol: Protocol,
+    private readonly protocol: Protocol,
   ) {}
 
   async start(): Promise<void> {

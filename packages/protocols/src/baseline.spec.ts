@@ -1,15 +1,12 @@
 import {
   type Delivery,
   type Graph,
-  PROTOCOL_LOGGER,
-  STORAGE_PORT,
-  type StoragePort,
+  ProtocolLogger,
+  StoragePort,
   type TaskState,
-  TRANSPORT_PORT,
-  type TransportPort,
-  WORKER_POOL_PORT,
+  TransportPort,
   WORKER_TOPICS,
-  type WorkerPoolPort,
+  WorkerPoolPort,
 } from '@mozart/contracts';
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -50,10 +47,10 @@ async function makeProtocol(): Promise<BaselineProtocol> {
   const moduleRef = await Test.createTestingModule({
     providers: [
       BaselineProtocol,
-      { provide: STORAGE_PORT, useValue: storage },
-      { provide: TRANSPORT_PORT, useValue: transport },
-      { provide: WORKER_POOL_PORT, useValue: workers },
-      { provide: PROTOCOL_LOGGER, useValue: { debug() {}, info() {}, warn() {}, error() {} } },
+      { provide: StoragePort, useValue: storage },
+      { provide: TransportPort, useValue: transport },
+      { provide: WorkerPoolPort, useValue: workers },
+      { provide: ProtocolLogger, useValue: { debug() {}, info() {}, warn() {}, error() {} } },
     ],
   }).compile();
   return moduleRef.get(BaselineProtocol);

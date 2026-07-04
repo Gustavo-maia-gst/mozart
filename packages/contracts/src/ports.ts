@@ -38,30 +38,33 @@ export interface Delivery {
  * Async at-least-once messaging, FIFO per (from, to) logical channel,
  * ack-based redelivery. Consumption is push-based: the harness invokes
  * `Protocol.onMessage`; the ack is issued when the handler resolves.
+ *
+ * Abstract class (not interface) so it doubles as a Nest DI token: protocols
+ * inject it by type via the constructor, no `@Inject` needed.
  */
-export interface TransportPort {
-  publish(to: NodeId, topic: string, body: Json): Promise<void>;
+export abstract class TransportPort {
+  abstract publish(to: NodeId, topic: string, body: Json): Promise<void>;
 }
 
 /**
  * Shared storage S (crash-recovery). During an outage calls do not fail —
  * they block until S recovers. Callers must tolerate arbitrary latency.
  */
-export interface StoragePort {
-  read(taskId: TaskId): Promise<TaskState | null>;
+export abstract class StoragePort {
+  abstract read(taskId: TaskId): Promise<TaskState | null>;
   /**
    * Snapshot query: return every task whose state matches `query` by equality
    * on each listed attribute (see {@link StorageQuery}). No locking; like
    * `read`, it just blocks under an outage. Order is unspecified.
    */
-  find(query: StorageQuery): Promise<TaskMatch[]>;
+  abstract find(query: StorageQuery): Promise<TaskMatch[]>;
   /**
    * Loads the state of `taskId` under mutual exclusion. Blocks until the
    * lock is acquired. The lock is released by `save`/`release` on the handle,
    * or forcibly by the harness if the holding node crashes.
    */
-  readExclusive(taskId: TaskId): Promise<ExclusiveRead>;
-  save(taskId: TaskId, data: TaskState): Promise<void>;
+  abstract readExclusive(taskId: TaskId): Promise<ExclusiveRead>;
+  abstract save(taskId: TaskId, data: TaskState): Promise<void>;
 }
 
 export interface ExclusiveRead {
@@ -77,8 +80,8 @@ export interface ExclusiveRead {
  * notified later as a transport delivery from node `W` (topics
  * `task.completed` / `task.failed`), subject to at-least-once semantics.
  */
-export interface WorkerPoolPort {
-  start(taskId: TaskId): Promise<void>;
+export abstract class WorkerPoolPort {
+  abstract start(taskId: TaskId): Promise<void>;
 }
 
 /** Topics used by the Worker Pool W when notifying coordinators. */
