@@ -149,7 +149,7 @@ export class TransportService {
     this.outstanding.set(deliveryId, ch);
   }
 
-  @Trace({ name: 'transport.redeliver', kind: SpanKind.PRODUCER })
+  @Trace({ name: (_ch, head: QueuedMessage) => `transport.redeliver(${head.topic})`, kind: SpanKind.PRODUCER })
   private emitRedelivery(ch: Channel, head: QueuedMessage, deliveryId: string): void {
     annotateSpan({
       [ATTR.channel]: ch.key,

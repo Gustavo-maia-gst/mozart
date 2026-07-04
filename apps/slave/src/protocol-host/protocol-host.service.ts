@@ -121,25 +121,28 @@ export class ProtocolHostService {
     else await this.onWorkerFail(delivery, { taskId });
   }
 
-  @Trace({ name: 'protocol.persistGraph' })
+  @Trace({ name: (graph: Graph) => `protocol.persistGraph(${graph.id})` })
   private async persistGraph(graph: Graph): Promise<void> {
     annotateSpan({ 'mozart.graph_id': graph.id });
     await this.protocol.persistGraph(graph);
   }
 
-  @Trace({ name: 'protocol.startGraph' })
+  @Trace({ name: (graph: Graph) => `protocol.startGraph(${graph.id})` })
   private async startGraph(graph: Graph): Promise<void> {
     annotateSpan({ 'mozart.graph_id': graph.id });
     await this.protocol.startGraph(graph.id);
   }
 
-  @Trace({ name: 'protocol.onWorkerSuccess', kind: SpanKind.CONSUMER })
+  @Trace({
+    name: (_d, event: WorkerSuccessEvent) => `protocol.onWorkerSuccess(${event.taskId})`,
+    kind: SpanKind.CONSUMER,
+  })
   private async onWorkerSuccess(delivery: Delivery, event: WorkerSuccessEvent): Promise<void> {
     this.annotate(delivery);
     await this.protocol.onWorkerSuccess(event);
   }
 
-  @Trace({ name: 'protocol.onWorkerFail', kind: SpanKind.CONSUMER })
+  @Trace({ name: (_d, event: WorkerFailEvent) => `protocol.onWorkerFail(${event.taskId})`, kind: SpanKind.CONSUMER })
   private async onWorkerFail(delivery: Delivery, event: WorkerFailEvent): Promise<void> {
     this.annotate(delivery);
     await this.protocol.onWorkerFail(event);
@@ -147,7 +150,7 @@ export class ProtocolHostService {
 
   // A Delivery is a structural superset of Message, so it flows straight to the
   // protocol as the narrowed view — the transport fields stay hidden by the type.
-  @Trace({ name: 'protocol.onMessage', kind: SpanKind.CONSUMER })
+  @Trace({ name: (delivery: Delivery) => `protocol.onMessage(${delivery.topic})`, kind: SpanKind.CONSUMER })
   private async onMessage(delivery: Delivery): Promise<void> {
     this.annotate(delivery);
     await this.protocol.onMessage(delivery);

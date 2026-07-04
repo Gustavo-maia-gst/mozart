@@ -15,13 +15,22 @@ export const ATTR = {
   topic: 'messaging.destination.name',
 } as const;
 
+/**
+ * Builds a span name from the decorated call's arguments, e.g.
+ * `(taskId) => \`worker.start(${taskId})\``. Only valid on method decorators.
+ */
+// `any[]` (not `unknown[]`): the builder mirrors the decorated method's own
+// arg types, which are erased at the decorator boundary — this keeps call sites
+// like `(taskId) => ...` ergonomic without per-site casts.
+export type SpanNameBuilder = (...args: any[]) => string;
+
 export interface TraceOptions {
   /**
-   * Explicit span name. On a method it is the full span name; on a class it is
-   * the prefix used for methods that don't set their own name (default: the
-   * class name). Methods without a name fall back to `<prefix>.<method>`.
+   * Explicit span name. On a method it is the full span name (or a builder that
+   * derives it from the call's args); on a class it is the prefix used for its
+   * methods (default: the class name), which then get `<prefix>.<method>`.
    */
-  name?: string;
+  name?: string | SpanNameBuilder;
   kind?: SpanKind;
 }
 
@@ -50,8 +59,9 @@ function stampScope(span: Span): void {
 }
 
 /** Wraps a method so each call runs inside an active span. */
-function wrap(original: AnyFn, spanName: string, kind?: SpanKind): AnyFn {
+function wrap(original: AnyFn, name: string | SpanNameBuilder, kind?: SpanKind): AnyFn {
   return function (this: unknown, ...args: unknown[]): unknown {
+    const spanName = typeof name === 'function' ? name(...args) : name;
     return trace.getTracer(TRACER_NAME).startActiveSpan(spanName, { kind: kind ?? SpanKind.INTERNAL }, (span) => {
       stampScope(span);
       try {
@@ -97,7 +107,8 @@ function decorateMethod(
 }
 
 function decorateClass(ctor: { name: string; prototype: object }, opts: TraceOptions): void {
-  const prefix = opts.name ?? ctor.name;
+  // A name builder only makes sense per method; at class level the name is a prefix.
+  const prefix = typeof opts.name === 'string' ? opts.name : ctor.name;
   for (const key of Object.getOwnPropertyNames(ctor.prototype)) {
     if (key === 'constructor') continue;
     const descriptor = Object.getOwnPropertyDescriptor(ctor.prototype, key);

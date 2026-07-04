@@ -50,7 +50,7 @@ export class WorkerPoolService {
     // Open a span spanning the whole execution — child of the caller's active
     // context (the coordinator's worker.start), held across the simulated
     // duration and ended on complete/fail below.
-    const span = tracer.startSpan('worker.execute', {
+    const span = tracer.startSpan(`worker.execute(${taskId})`, {
       attributes: { [ATTR.taskId]: taskId, [ATTR.nodeId]: nodeId },
     });
     this.spans.set(taskId, span);
