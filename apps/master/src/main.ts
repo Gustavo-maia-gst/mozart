@@ -4,19 +4,41 @@ import { initTelemetry } from '@mozart/telemetry';
 import { loadEnv } from './config/env';
 import { loadScenario } from './scenario/scenario';
 
+/**
+ * Resolves the scenario file to run. An explicit arg is used as a path when it
+ * looks like one (has a slash or a `.y(a)ml` extension), else as a name under
+ * `scenarios/`. With no arg it defaults to the protocol's own file. Returns
+ * undefined when neither a scenario nor a protocol was provided.
+ */
+function resolveScenarioPath(arg: string | undefined, protocol: string | undefined): string | undefined {
+  const name = arg ?? protocol;
+  if (!name) return undefined;
+  if (name.includes('/') || name.endsWith('.yaml') || name.endsWith('.yml')) return name;
+  return `scenarios/${name}.yaml`;
+}
+
 async function bootstrap(): Promise<void> {
-  const { values } = parseArgs({
+  const { values, positionals } = parseArgs({
+    allowPositionals: true,
     options: {
+      protocol: { type: 'string', short: 'p' },
       scenario: { type: 'string', short: 's' },
       'dry-run': { type: 'boolean', default: false },
     },
   });
-  if (!values.scenario) {
-    throw new Error('usage: master --scenario <path.yaml> [--dry-run]');
+
+  // Accept `master <protocol> [scenario]` positionally, or the equivalent
+  // `--protocol`/`--scenario` flags. The scenario defaults to the protocol's
+  // own file, and the passed protocol (if any) overrides the document.
+  const protocol = values.protocol ?? positionals[0];
+  const scenarioArg = values.scenario ?? positionals[1];
+  const scenarioPath = resolveScenarioPath(scenarioArg, protocol);
+  if (!scenarioPath) {
+    throw new Error('usage: master <protocol> [scenario] | --scenario <path.yaml> [--dry-run]');
   }
 
   const env = loadEnv();
-  const scenario = loadScenario(values.scenario);
+  const scenario = loadScenario(scenarioPath, protocol);
   const runId = `${scenario.name}-${randomUUID().slice(0, 8)}`;
 
   // Telemetry first: instrumentation must patch libraries before the app graph

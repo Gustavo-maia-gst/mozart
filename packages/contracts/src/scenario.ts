@@ -29,18 +29,24 @@ export type DistributionConfig = z.infer<typeof distributionSchema>;
 
 const nodeIdSchema = z.string().min(1);
 const taskIdSchema = z.string().min(1);
+const graphIdSchema = z.string().min(1);
 
-export const dagSchema = z.object({
-  tasks: z
-    .array(
-      z.object({
-        id: taskIdSchema,
-        dependsOn: z.array(taskIdSchema).default([]),
-        /** Nominal cost (ms) used as the mean of the sampled task duration when set. */
-        costMs: z.number().positive().optional(),
-      }),
-    )
-    .min(1),
+export const graphTaskSchema = z.object({
+  id: taskIdSchema,
+  dependsOn: z.array(taskIdSchema).default([]),
+  /** Nominal cost (ms) used as the mean of the sampled task duration when set. */
+  costMs: z.number().positive().optional(),
+});
+
+/**
+ * One DAG. Task ids (and their `dependsOn`) are graph-local here; they get
+ * namespaced to `<graphId>-<taskId>` when the runtime graphs are built, so ids
+ * stay globally unique across the several graphs a run may execute at once
+ * (see {@link graphsFromScenario}).
+ */
+export const graphSchema = z.object({
+  id: graphIdSchema,
+  tasks: z.array(graphTaskSchema).min(1),
 });
 
 export const faultSchema = z.discriminatedUnion('action', [
@@ -86,7 +92,8 @@ export const scenarioSchema = z.object({
   protocol: z.string().min(1),
   /** Each coordinator's `name` drives its OTel service (defaults to `id`). */
   nodes: z.array(z.object({ id: nodeIdSchema, name: z.string().min(1).optional() })).min(1),
-  dag: dagSchema,
+  /** One or more concurrent DAGs to coordinate in this run. */
+  graphs: z.array(graphSchema).min(1),
   storage: z.discriminatedUnion('adapter', [
     z.object({ adapter: z.literal('in-memory') }),
     z.object({
@@ -102,8 +109,9 @@ export const scenarioSchema = z.object({
   endCondition: z.discriminatedUnion('type', [z.object({ type: z.literal('timeout'), ms: z.number().positive() })]),
 });
 
-export type Scenario = z.infer<typeof scenarioSchema>;
-export type DagSpec = z.infer<typeof dagSchema>;
+/** The validated, plain scenario document (what the YAML parses into). */
+export type ScenarioData = z.infer<typeof scenarioSchema>;
+export type GraphSpec = z.infer<typeof graphSchema>;
 
 /** Slice of the scenario a slave receives at handshake. */
 export interface ScenarioInfo {
@@ -113,12 +121,80 @@ export interface ScenarioInfo {
   protocol: string;
   /** All coordinator node ids (excluding `W`). */
   nodes: string[];
-  dag: DagSpec;
-  /** Concurrent DAGs to coordinate. Derived from `dag` (as graph `g0`) for now. */
+  /** The concurrent DAGs to coordinate, with runtime (namespaced) task ids. */
   graphs: Graph[];
 }
 
-/** The scenario's DAG as a single graph `g0` (until multi-graph scenarios land). */
-export function graphsFromScenario(scenario: Scenario): Graph[] {
-  return [{ id: 'g0', tasks: scenario.dag.tasks }];
+/**
+ * A parsed scenario with behaviour. Wraps the plain {@link ScenarioData} and is
+ * the one place scenario-derived values are computed — notably {@link graphs},
+ * whose task ids are namespaced to `<graphId>-<taskId>` so they stay globally
+ * unique across the concurrent DAGs a run executes. Consumers depend on this,
+ * never on the raw document.
+ */
+export class Scenario {
+  private cachedGraphs?: Graph[];
+
+  constructor(private readonly data: ScenarioData) {}
+
+  /** Runtime graphs: task ids (and `dependsOn`) namespaced as `<graphId>-<taskId>`. */
+  get graphs(): Graph[] {
+    if (!this.cachedGraphs) {
+      this.cachedGraphs = this.data.graphs.map((graph) => ({
+        id: graph.id,
+        tasks: graph.tasks.map((task) => ({
+          id: `${graph.id}-${task.id}`,
+          dependsOn: task.dependsOn.map((dep) => `${graph.id}-${dep}`),
+          ...(task.costMs !== undefined ? { costMs: task.costMs } : {}),
+        })),
+      }));
+    }
+    return this.cachedGraphs;
+  }
+
+  get name(): string {
+    return this.data.name;
+  }
+  get seed(): string {
+    return this.data.seed;
+  }
+  get protocol(): string {
+    return this.data.protocol;
+  }
+  get latency(): ScenarioData['latency'] {
+    return this.data.latency;
+  }
+  get faults(): FaultSpec[] {
+    return this.data.faults;
+  }
+  get storage(): ScenarioData['storage'] {
+    return this.data.storage;
+  }
+  get ackTimeoutMs(): number {
+    return this.data.transport.ackTimeoutMs;
+  }
+  get endConditionMs(): number {
+    return this.data.endCondition.ms;
+  }
+
+  /** Coordinator node ids (the scenario's `nodes`, excluding the implicit W). */
+  coordinatorIds(): string[] {
+    return this.data.nodes.map((n) => n.id);
+  }
+
+  /** A coordinator's display name (drives its OTel service); defaults to its id. */
+  nodeName(nodeId: string): string {
+    return this.data.nodes.find((n) => n.id === nodeId)?.name ?? nodeId;
+  }
+
+  /** The per-node slice handed to a slave at handshake. */
+  infoFor(nodeId: string, runId: string): ScenarioInfo {
+    return {
+      runId,
+      nodeId,
+      protocol: this.data.protocol,
+      nodes: this.coordinatorIds(),
+      graphs: this.graphs,
+    };
+  }
 }

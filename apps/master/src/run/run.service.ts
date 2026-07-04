@@ -61,7 +61,7 @@ export class RunService {
     this.pm.activateAll();
     this.faults.arm(); // fault `at` offsets count from activation
 
-    await this.sleep(this.scenario.endCondition.ms);
+    await this.sleep(this.scenario.endConditionMs);
 
     this.logger.log('end condition reached — shutting down');
     this.pm.shutdown();

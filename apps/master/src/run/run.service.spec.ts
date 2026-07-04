@@ -1,23 +1,23 @@
 import { readFileSync, rmSync } from 'node:fs';
-import type { Scenario } from '@mozart/contracts';
+import { Scenario } from '@mozart/contracts';
 import { Test } from '@nestjs/testing';
 import { afterAll, describe, expect, it } from 'vitest';
 import { CoreModule } from '../core/core.module';
 import { RunModule } from './run.module';
 import { RunService } from './run.service';
 
-const scenario: Scenario = {
+const scenario = new Scenario({
   name: 'unit',
   seed: '1',
   protocol: 'baseline',
   nodes: [{ id: 'n1' }, { id: 'n2' }],
-  dag: { tasks: [{ id: 't1', dependsOn: [] }] },
+  graphs: [{ id: 'g0', tasks: [{ id: 't1', dependsOn: [] }] }],
   storage: { adapter: 'in-memory' },
   transport: { ackTimeoutMs: 2000 },
   latency: {},
   faults: [],
   endCondition: { type: 'timeout', ms: 1000 },
-};
+});
 
 const logDir = 'runs/__test__';
 

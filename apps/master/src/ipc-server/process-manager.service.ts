@@ -6,7 +6,6 @@ import { traceContextHooks } from '@mozart/telemetry';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { EnvConfig } from '../config/env';
 import { EventLogService } from '../event-log/event-log.service';
-import { coordinatorIds } from '../scenario/scenario';
 import { StorageService } from '../storage/storage.service';
 import { ENV_CONFIG, RUN_ID, SCENARIO } from '../tokens';
 import { IpcHostService } from './ipc-host.service';
@@ -46,12 +45,12 @@ export class ProcessManagerService {
   }
 
   public spawnAll(): void {
-    for (const nodeId of coordinatorIds(this.scenario)) this.spawn(nodeId);
+    for (const nodeId of this.scenario.coordinatorIds()) this.spawn(nodeId);
   }
 
   public spawn(nodeId: NodeId): void {
     const entrypoint = this.env.MOZART_SLAVE_ENTRYPOINT ?? join(process.cwd(), 'apps/slave/dist/main.js');
-    const name = this.scenario.nodes.find((n) => n.id === nodeId)?.name ?? nodeId;
+    const name = this.scenario.nodeName(nodeId);
     const child = fork(entrypoint, [], {
       serialization: 'json',
       execArgv: [],
@@ -105,7 +104,7 @@ export class ProcessManagerService {
     return new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`nodes not ready within ${timeoutMs}ms`)), timeoutMs);
       this.readyCheck = () => {
-        if (this.ready.size >= coordinatorIds(this.scenario).length) {
+        if (this.ready.size >= this.scenario.coordinatorIds().length) {
           clearTimeout(timer);
           this.readyCheck = undefined;
           resolve();

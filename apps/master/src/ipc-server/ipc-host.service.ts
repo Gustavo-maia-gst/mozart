@@ -1,7 +1,6 @@
 import type { NodeId, Scenario } from '@mozart/contracts';
 import type { RpcHandlers } from '@mozart/ipc';
 import { Inject, Injectable } from '@nestjs/common';
-import { scenarioInfoFor } from '../scenario/scenario';
 import { StorageService } from '../storage/storage.service';
 import { RUN_ID, SCENARIO } from '../tokens';
 import { TransportService } from '../transport/transport.service';
@@ -29,7 +28,7 @@ export class IpcHostService {
     return {
       'node.ready': (nodeId) => {
         this.onNodeReady?.(nodeId);
-        return Promise.resolve({ scenario: scenarioInfoFor(this.scenario, this.runId, nodeId) });
+        return Promise.resolve({ scenario: this.scenario.infoFor(nodeId, this.runId) });
       },
       'transport.publish': (nodeId, { to, topic, body }) =>
         Promise.resolve({ messageId: this.transport.publish(nodeId, to, topic, body) }),

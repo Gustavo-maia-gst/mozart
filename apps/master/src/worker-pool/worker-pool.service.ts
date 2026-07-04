@@ -31,7 +31,10 @@ export class WorkerPoolService {
     private readonly transport: TransportService,
     private readonly events: EventLogService,
   ) {
-    for (const task of scenario.dag.tasks) this.costs.set(task.id, task.costMs);
+    // Key costs by the runtime (namespaced) task id — the same id worker.start receives.
+    for (const graph of scenario.graphs) {
+      for (const task of graph.tasks) this.costs.set(task.id, task.costMs);
+    }
   }
 
   /** Marks `taskId`'s next execution to fail (one-shot). */

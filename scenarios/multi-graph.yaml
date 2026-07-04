@@ -1,0 +1,41 @@
+# Bigger demo: one centralized coordinator driving THREE concurrent DAGs of
+# different shapes. Runtime task ids are namespaced per graph (g0-a, g1-x, ...),
+# so ids never collide across graphs. Nice for eyeballing the trace tree in
+# Jaeger — three independent forests under one coordinator.
+name: multi-graph
+seed: 7
+protocol: baseline
+nodes: [{ id: n1, name: coordinator }]
+
+graphs:
+  # g0 — diamond: a -> {b, c} -> d
+  - id: g0
+    tasks:
+      - { id: a, costMs: 40 }
+      - { id: b, dependsOn: [a], costMs: 40 }
+      - { id: c, dependsOn: [a], costMs: 60 }
+      - { id: d, dependsOn: [b, c], costMs: 40 }
+
+  # g1 — chain: x -> y -> z
+  - id: g1
+    tasks:
+      - { id: x, costMs: 50 }
+      - { id: y, dependsOn: [x], costMs: 50 }
+      - { id: z, dependsOn: [y], costMs: 50 }
+
+  # g2 — fan-out then join: p -> {q, r, s} -> t
+  - id: g2
+    tasks:
+      - { id: p, costMs: 30 }
+      - { id: q, dependsOn: [p], costMs: 70 }
+      - { id: r, dependsOn: [p], costMs: 30 }
+      - { id: s, dependsOn: [p], costMs: 50 }
+      - { id: t, dependsOn: [q, r, s], costMs: 30 }
+
+storage: { adapter: in-memory }
+transport: { ackTimeoutMs: 2000 }
+latency:
+  transport.deliver: { distribution: normal, mean: 15, stddev: 5 }
+  storage.read: { distribution: constant, value: 5 }
+  storage.save: { distribution: constant, value: 5 }
+endCondition: { type: timeout, ms: 4000 }

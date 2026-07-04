@@ -16,6 +16,7 @@
     "lint": "biome check",
     "lint:fix": "biome check --fix --unsafe",
     "demo": "pnpm build && node apps/master/dist/main.js --scenario scenarios/baseline.yaml",
+    "run:protocol": "pnpm build && node apps/master/dist/main.js",
     "traces:clean": "docker compose restart jaeger"
   },
   "devDependencies": {

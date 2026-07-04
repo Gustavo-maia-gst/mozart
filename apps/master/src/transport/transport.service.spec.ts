@@ -1,4 +1,4 @@
-import type { Delivery, NodeId, Scenario } from '@mozart/contracts';
+import { type Delivery, type NodeId, Scenario, type ScenarioData } from '@mozart/contracts';
 import { LatencyModel } from '@mozart/latency';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { CancelHandle, Clock, Scheduler } from '../clock/clock';
@@ -55,7 +55,7 @@ class FakeEventLog {
   }
 }
 
-const scenario = { transport: { ackTimeoutMs: 100 } } as Scenario;
+const scenario = new Scenario({ transport: { ackTimeoutMs: 100 } } as ScenarioData);
 
 function build(latencyMs = 0) {
   const time = new VirtualTime();

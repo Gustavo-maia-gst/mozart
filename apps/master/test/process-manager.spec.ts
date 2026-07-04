@@ -1,6 +1,6 @@
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Scenario } from '@mozart/contracts';
+import { Scenario } from '@mozart/contracts';
 import { Test } from '@nestjs/testing';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CoreModule } from '../src/core/core.module';
@@ -14,18 +14,18 @@ const distReady = existsSync(join(__dirname, '..', '..', '..', 'packages', 'ipc'
 const fixture = join(__dirname, 'fixture-node.cjs');
 const logDir = 'runs/__pmtest__';
 
-const scenario: Scenario = {
+const scenario = new Scenario({
   name: 'pm',
   seed: '1',
-  protocol: 'echo',
+  protocol: 'baseline',
   nodes: [{ id: 'n1' }],
-  dag: { tasks: [{ id: 't1', dependsOn: [] }] },
+  graphs: [{ id: 'g0', tasks: [{ id: 't1', dependsOn: [] }] }],
   storage: { adapter: 'in-memory' },
   transport: { ackTimeoutMs: 2000 },
   latency: {},
   faults: [],
   endCondition: { type: 'timeout', ms: 5000 },
-};
+});
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 

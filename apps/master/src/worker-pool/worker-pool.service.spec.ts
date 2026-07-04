@@ -1,4 +1,4 @@
-import { type Json, type NodeId, type Scenario, WORKER_NODE_ID, WORKER_TOPICS } from '@mozart/contracts';
+import { type Json, type NodeId, Scenario, type ScenarioData, WORKER_NODE_ID, WORKER_TOPICS } from '@mozart/contracts';
 import { LatencyModel } from '@mozart/latency';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { CancelHandle, Clock, Scheduler } from '../clock/clock';
@@ -52,14 +52,17 @@ class FakeEventLog {
   }
 }
 
-const scenario = {
-  dag: {
-    tasks: [
-      { id: 't1', dependsOn: [], costMs: 100 },
-      { id: 't2', dependsOn: [] },
-    ],
-  },
-} as Scenario;
+const scenario = new Scenario({
+  graphs: [
+    {
+      id: 'g0',
+      tasks: [
+        { id: 't1', dependsOn: [], costMs: 100 },
+        { id: 't2', dependsOn: [] },
+      ],
+    },
+  ],
+} as ScenarioData);
 
 function build() {
   const time = new VirtualTime();
@@ -86,17 +89,17 @@ describe('WorkerPoolService', () => {
 
   it('publishes task.completed to the starting node after the task duration', () => {
     const { worker, time, transport } = ctx;
-    worker.start('n1', 't1');
+    worker.start('n1', 'g0-t1');
     expect(transport.published).toHaveLength(0);
-    time.advance(100); // t1 costMs
+    time.advance(100); // g0-t1 costMs
     expect(transport.published).toEqual([
-      { from: WORKER_NODE_ID, to: 'n1', topic: WORKER_TOPICS.completed, body: { taskId: 't1' } },
+      { from: WORKER_NODE_ID, to: 'n1', topic: WORKER_TOPICS.completed, body: { taskId: 'g0-t1' } },
     ]);
   });
 
   it('uses the sampled duration when the task has no costMs', () => {
     const { worker, time, transport } = ctx;
-    worker.start('n1', 't2'); // no costMs => latency 50
+    worker.start('n1', 'g0-t2'); // no costMs => latency 50
     time.advance(49);
     expect(transport.published).toHaveLength(0);
     time.advance(1);
@@ -105,8 +108,8 @@ describe('WorkerPoolService', () => {
 
   it('ignores a duplicate start while the task is running', () => {
     const { worker, time, transport, log } = ctx;
-    worker.start('n1', 't1');
-    worker.start('n1', 't1');
+    worker.start('n1', 'g0-t1');
+    worker.start('n1', 'g0-t1');
     expect(log.ofType('worker.duplicate-start')).toHaveLength(1);
     time.advance(100);
     expect(transport.published).toHaveLength(1); // only one completion
@@ -114,21 +117,21 @@ describe('WorkerPoolService', () => {
 
   it('allows restart after completion', () => {
     const { worker, time, transport } = ctx;
-    worker.start('n1', 't1');
+    worker.start('n1', 'g0-t1');
     time.advance(100);
-    worker.start('n1', 't1');
+    worker.start('n1', 'g0-t1');
     time.advance(100);
     expect(transport.published).toHaveLength(2);
   });
 
   it('emits task.failed (one-shot) when the task is marked to fail', () => {
     const { worker, time, transport } = ctx;
-    worker.failTask('t1');
-    worker.start('n1', 't1');
+    worker.failTask('g0-t1');
+    worker.start('n1', 'g0-t1');
     time.advance(100);
     expect(transport.published[0]?.topic).toBe(WORKER_TOPICS.failed);
 
-    worker.start('n1', 't1'); // fail flag was one-shot
+    worker.start('n1', 'g0-t1'); // fail flag was one-shot
     time.advance(100);
     expect(transport.published[1]?.topic).toBe(WORKER_TOPICS.completed);
   });

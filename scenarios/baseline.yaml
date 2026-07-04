@@ -4,12 +4,13 @@ name: baseline
 seed: 1
 protocol: baseline
 nodes: [{ id: n1, name: coordinator }]
-dag:
-  tasks:
-    - { id: a, costMs: 50 }
-    - { id: b, dependsOn: [a], costMs: 50 }
-    - { id: c, dependsOn: [a], costMs: 50 }
-    - { id: d, dependsOn: [b, c], costMs: 50 }
+graphs:
+  - id: g0
+    tasks:
+      - { id: a, costMs: 50 }
+      - { id: b, dependsOn: [a], costMs: 50 }
+      - { id: c, dependsOn: [a], costMs: 50 }
+      - { id: d, dependsOn: [b, c], costMs: 50 }
 storage: { adapter: in-memory }
 transport: { ackTimeoutMs: 2000 }
 latency:

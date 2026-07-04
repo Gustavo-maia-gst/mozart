@@ -33,7 +33,7 @@ export class TransportService {
     private readonly events: EventLogService,
     private readonly network: NetworkState,
   ) {
-    this.ackTimeoutMs = scenario.transport.ackTimeoutMs;
+    this.ackTimeoutMs = scenario.ackTimeoutMs;
   }
 
   /** Enqueue a message; captures the active trace context for propagation. */
