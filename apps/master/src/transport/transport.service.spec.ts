@@ -24,9 +24,7 @@ class VirtualTime implements Clock, Scheduler {
   advance(ms: number): void {
     const target = this.t + ms;
     for (;;) {
-      const due = this.timers
-        .filter((x) => x.at <= target)
-        .sort((a, b) => a.at - b.at)[0];
+      const due = this.timers.filter((x) => x.at <= target).sort((a, b) => a.at - b.at)[0];
       if (!due) break;
       this.timers = this.timers.filter((x) => x !== due);
       this.t = due.at;

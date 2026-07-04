@@ -95,7 +95,7 @@ void _assertContracts;
 
 export interface PushContracts {
   /** Transport delivery (protocol messages and W events alike). */
-  'delivery': Delivery;
+  delivery: Delivery;
   /** Run started: protocol should run onActivate. */
   'protocol.activate': Record<string, never>;
   /** Graceful shutdown request: run onDeactivate, then exit(0). */

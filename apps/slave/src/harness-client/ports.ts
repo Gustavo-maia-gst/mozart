@@ -38,8 +38,11 @@ export class WorkerPoolClient implements WorkerPoolPort {
   constructor(@Inject(IPC_CLIENT) private readonly ipc: IpcClient) {}
 
   async start(taskId: TaskId): Promise<void> {
-    await withSpan(tracer, 'worker.start', { ...CLIENT, attributes: { [ATTR.taskId]: taskId } }, () =>
-      this.ipc.call('worker.start', { taskId }),
+    await withSpan(
+      tracer,
+      'worker.start',
+      { ...CLIENT, attributes: { [ATTR.taskId]: taskId } },
+      () => this.ipc.call('worker.start', { taskId }),
     );
   }
 }
@@ -49,8 +52,11 @@ export class StorageClient implements StoragePort {
   constructor(@Inject(IPC_CLIENT) private readonly ipc: IpcClient) {}
 
   read(taskId: TaskId): Promise<TaskState | null> {
-    return withSpan(tracer, 'storage.read', { ...CLIENT, attributes: { [ATTR.taskId]: taskId } }, () =>
-      this.ipc.call('storage.read', { taskId }).then((r) => r.data),
+    return withSpan(
+      tracer,
+      'storage.read',
+      { ...CLIENT, attributes: { [ATTR.taskId]: taskId } },
+      () => this.ipc.call('storage.read', { taskId }).then((r) => r.data),
     );
   }
 

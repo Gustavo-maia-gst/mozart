@@ -45,7 +45,7 @@ describe.runIf(distReady)('IPC over a real fork', () => {
       makeHandlers({
         'node.ready': () => Promise.resolve({ scenario: { nodeId: 'n1' } as never }),
         'worker.start': (_n, p) => {
-          resolveReady((p as { taskId: string }).taskId);
+          resolveReady(p.taskId);
           return Promise.resolve({});
         },
         // Never resolves: the child will hang here until we kill it.

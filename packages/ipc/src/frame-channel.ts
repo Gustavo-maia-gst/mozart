@@ -44,7 +44,7 @@ function attachMessageValidation(
       opts?.onInvalidFrame?.(raw, parsed.error);
       return;
     }
-    cb(parsed.data as IpcFrame);
+    cb(parsed.data);
   });
 }
 
@@ -54,8 +54,7 @@ export function processFrameChannel(
   opts?: FrameChannelOptions,
 ): FrameChannel {
   return {
-    send: (frame) =>
-      guardedSend((f) => (proc.send ? proc.send(f) : false), frame),
+    send: (frame) => guardedSend((f) => (proc.send ? proc.send(f) : false), frame),
     onMessage: (cb) => attachMessageValidation(proc, opts, cb),
     onClose: (cb) => {
       proc.on('disconnect', cb);

@@ -66,10 +66,7 @@ export class NodeLink {
       return;
     }
 
-    const handler = this.handlers[method] as (
-      nodeId: NodeId,
-      payload: unknown,
-    ) => Promise<unknown>;
+    const handler = this.handlers[method] as (nodeId: NodeId, payload: unknown) => Promise<unknown>;
 
     this.hooks
       .runWithTraceCtx(frame.traceCtx, () => handler(this.nodeId, parsed.data))
@@ -88,7 +85,12 @@ export class NodeLink {
 
   private sendError(req: IpcFrame, code: string, message: string): void {
     this.channel.send(
-      newFrame({ kind: 'res', correlId: req.frameId, ok: false, payload: { error: { code, message } } }),
+      newFrame({
+        kind: 'res',
+        correlId: req.frameId,
+        ok: false,
+        payload: { error: { code, message } },
+      }),
     );
   }
 }

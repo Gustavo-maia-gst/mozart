@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { LatencyModel } from '@mozart/latency';
-import { WORKER_NODE_ID, WORKER_TOPICS, type Json, type NodeId, type Scenario } from '@mozart/contracts';
+import {
+  WORKER_NODE_ID,
+  WORKER_TOPICS,
+  type Json,
+  type NodeId,
+  type Scenario,
+} from '@mozart/contracts';
 import type { CancelHandle, Clock, Scheduler } from '../clock/clock';
 import type { EventInput, EventLogService } from '../event-log/event-log.service';
 import type { TransportService } from '../transport/transport.service';
@@ -53,7 +59,12 @@ class FakeEventLog {
 }
 
 const scenario = {
-  dag: { tasks: [{ id: 't1', dependsOn: [], costMs: 100 }, { id: 't2', dependsOn: [] }] },
+  dag: {
+    tasks: [
+      { id: 't1', dependsOn: [], costMs: 100 },
+      { id: 't2', dependsOn: [] },
+    ],
+  },
 } as Scenario;
 
 function build() {

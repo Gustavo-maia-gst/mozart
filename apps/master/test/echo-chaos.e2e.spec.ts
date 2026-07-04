@@ -19,7 +19,12 @@ const scenario: Scenario = {
   seed: '42',
   protocol: 'echo',
   nodes: [{ id: 'n1' }, { id: 'n2' }],
-  dag: { tasks: [{ id: 't1', dependsOn: [], costMs: 40 }, { id: 't2', dependsOn: ['t1'], costMs: 40 }] },
+  dag: {
+    tasks: [
+      { id: 't1', dependsOn: [], costMs: 40 },
+      { id: 't2', dependsOn: ['t1'], costMs: 40 },
+    ],
+  },
   storage: { adapter: 'in-memory' },
   transport: { ackTimeoutMs: 120 },
   latency: {

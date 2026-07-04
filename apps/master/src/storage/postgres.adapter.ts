@@ -47,7 +47,8 @@ export class PostgresStorageAdapter implements StorageAdapter {
 
   async acquire(taskId: TaskId, signal: AbortSignal): Promise<AdapterLease> {
     const client = await this.pool.connect();
-    const pid = (await client.query<{ pid: number }>('select pg_backend_pid() as pid')).rows[0]!.pid;
+    const pid = (await client.query<{ pid: number }>('select pg_backend_pid() as pid')).rows[0]!
+      .pid;
     const onAbort = (): void => {
       void this.pool.query('select pg_cancel_backend($1)', [pid]).catch(() => {});
     };

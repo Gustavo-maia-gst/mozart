@@ -10,7 +10,9 @@ import { NodeRegistry } from '../src/ipc-server/node-registry';
 import { ProcessManagerService } from '../src/ipc-server/process-manager.service';
 import { StorageService } from '../src/storage/storage.service';
 
-const distReady = existsSync(join(__dirname, '..', '..', '..', 'packages', 'ipc', 'dist', 'index.js'));
+const distReady = existsSync(
+  join(__dirname, '..', '..', '..', 'packages', 'ipc', 'dist', 'index.js'),
+);
 const fixture = join(__dirname, 'fixture-node.cjs');
 const logDir = 'runs/__pmtest__';
 

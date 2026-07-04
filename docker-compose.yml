@@ -3,9 +3,9 @@ services:
     image: jaegertracing/jaeger:2.9.0
     container_name: mozart-jaeger
     ports:
-      - "16686:16686" # UI
-      - "4318:4318"   # OTLP http
-      - "4317:4317"   # OTLP grpc
+      - '16686:16686' # UI
+      - '4318:4318' # OTLP http
+      - '4317:4317' # OTLP grpc
   postgres:
     image: postgres:17-alpine
     container_name: mozart-postgres
@@ -14,8 +14,8 @@ services:
       POSTGRES_PASSWORD: mozart
       POSTGRES_DB: mozart
     ports:
-      - "5432:5432"
+      - '5432:5432'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mozart"]
+      test: ['CMD-SHELL', 'pg_isready -U mozart']
       interval: 2s
       retries: 15

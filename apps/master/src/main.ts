@@ -39,11 +39,11 @@ async function bootstrap(): Promise<void> {
 
   try {
     const summary = await app.get(RunService).run({ dryRun: values['dry-run'] });
-    // eslint-disable-next-line no-console
+
     console.log('\n=== run summary ===');
-    // eslint-disable-next-line no-console
+
     console.log(JSON.stringify(summary, null, 2));
-    // eslint-disable-next-line no-console
+
     console.log('Jaeger: http://localhost:16686/search?service=mozart-master');
   } finally {
     await app.close();
@@ -52,7 +52,6 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch((err: unknown) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

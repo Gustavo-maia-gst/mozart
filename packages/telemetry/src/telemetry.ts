@@ -45,7 +45,8 @@ export function initTelemetry(opts: InitTelemetryOptions): Telemetry {
     'http://localhost:4318/v1/traces';
 
   const exporter = new OTLPTraceExporter({ url });
-  const kind = opts.processor ?? (process.env.MOZART_OTEL_PROCESSOR as 'simple' | undefined) ?? 'batch';
+  const kind =
+    opts.processor ?? (process.env.MOZART_OTEL_PROCESSOR as 'simple' | undefined) ?? 'batch';
   const processor: SpanProcessor =
     kind === 'simple'
       ? new SimpleSpanProcessor(exporter)

@@ -40,8 +40,7 @@ export class IpcHostService {
       'storage.read': async (nodeId, { taskId }) => ({
         data: await this.storage.read(nodeId, taskId),
       }),
-      'storage.readExclusive': (nodeId, { taskId }) =>
-        this.storage.readExclusive(nodeId, taskId),
+      'storage.readExclusive': (nodeId, { taskId }) => this.storage.readExclusive(nodeId, taskId),
       'storage.save': async (nodeId, { taskId, data }) => {
         await this.storage.save(nodeId, taskId, data);
         return {};

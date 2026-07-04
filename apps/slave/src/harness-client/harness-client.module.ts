@@ -11,7 +11,10 @@ import { StorageClient, TransportClient, WorkerPoolClient } from './ports';
  */
 @Module({
   providers: [
-    { provide: IPC_CLIENT, useFactory: () => new IpcClient(processFrameChannel(), traceContextHooks()) },
+    {
+      provide: IPC_CLIENT,
+      useFactory: () => new IpcClient(processFrameChannel(), traceContextHooks()),
+    },
     TransportClient,
     StorageClient,
     WorkerPoolClient,

@@ -54,7 +54,15 @@ function makeCtx(tasks: { id: string; dependsOn: string[] }[] = [{ id: 't1', dep
 }
 
 function ping(messageId: string): Delivery {
-  return { deliveryId: `d-${messageId}`, messageId, from: 'n2', topic: 'ping', body: {}, attempt: 1, traceCtx: {} };
+  return {
+    deliveryId: `d-${messageId}`,
+    messageId,
+    from: 'n2',
+    topic: 'ping',
+    body: {},
+    attempt: 1,
+    traceCtx: {},
+  };
 }
 
 describe('EchoProtocol', () => {
@@ -94,7 +102,15 @@ describe('EchoProtocol', () => {
       { id: 't2', dependsOn: ['t1'] },
     ]);
     await new EchoProtocol().onMessage(
-      { deliveryId: 'd', messageId: 'c1', from: 'W', topic: 'task.completed', body: { taskId: 't1' }, attempt: 1, traceCtx: {} },
+      {
+        deliveryId: 'd',
+        messageId: 'c1',
+        from: 'W',
+        topic: 'task.completed',
+        body: { taskId: 't1' },
+        attempt: 1,
+        traceCtx: {},
+      },
       ctx,
     );
     expect(started).toEqual(['t2']);

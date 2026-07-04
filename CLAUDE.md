@@ -22,7 +22,7 @@ pnpm demo                   # roda scenarios/echo-smoke.yaml
   (filas Pub/Sub-like: at-least-once, FIFO por canal, ack + redelivery), Worker Pool W
   simulado, Storage S (port + adapters in-memory/postgres), injetor de falhas,
   process manager (fork/SIGKILL/restart de slaves), event log JSONL (`runs/<id>/`).
-  O master é *silencioso*: não participa do protocolo.
+  O master é _silencioso_: não participa do protocolo.
 - **`apps/slave`** — runner genérico de protocolo (NestJS). Stateless. Todo efeito
   colateral (transport/W/S) atravessa IPC até o master.
 - **`packages/contracts`** — ports (TransportPort/StoragePort/WorkerPoolPort),
@@ -56,5 +56,11 @@ Direção de dependência: `apps → packages`; `packages → contracts` apenas.
   deps ESM-only (d3-random) funcionam via require(esm) do Node ≥22.12.
 - Testes: vitest, specs ao lado do código (`*.spec.ts`); integração PG atrás de
   `MOZART_INTEGRATION=1`; fake timers via tokens `Clock`/`Scheduler` injetados.
-- Cenários YAML em `scenarios/` = *o que rodar* (nós, DAG, latências, faults, seed);
-  env via `@nestjs/config` = *onde as coisas estão* (OTLP, PG URL, entrypoint slave).
+- Cenários YAML em `scenarios/` = _o que rodar_ (nós, DAG, latências, faults, seed);
+  env via `@nestjs/config` = _onde as coisas estão_ (OTLP, PG URL, entrypoint slave).
+- Build é `tsc -b` (project references). Se você apagar `dist/` manualmente, o cache
+  incremental fica stale — rode `pnpm clean && pnpm build` (ou `tsc -b --force`).
+- Testes de fork/e2e rodam contra `dist/` (não tsx), então **buildar antes**; eles
+  se auto-skipam via `describe.runIf(distReady)` se o dist não existir.
+- OTLP: string vazia em `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` cai no default
+  (`localhost:4318`); sem Jaeger o export falha em silêncio (não quebra o run).

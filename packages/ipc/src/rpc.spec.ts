@@ -90,9 +90,9 @@ describe('IpcClient <-> NodeLink RPC', () => {
     new NodeLink('n1', host, makeHandlers({}));
     const c = new IpcClient(client);
     // taskId must be a non-empty string.
-    await expect(
-      c.call('storage.read', { taskId: '' } as unknown as { taskId: string }),
-    ).rejects.toMatchObject({ code: 'invalid_payload' });
+    await expect(c.call('storage.read', { taskId: '' })).rejects.toMatchObject({
+      code: 'invalid_payload',
+    });
   });
 
   it('delivers pushes to the client push handler', async () => {
@@ -133,12 +133,17 @@ describe('IpcClient <-> NodeLink RPC', () => {
   it('runs host handlers within the extracted trace context', async () => {
     const { client, host } = linkedChannels();
     const seen: string[] = [];
-    new NodeLink('n1', host, makeHandlers({ 'node.ready': () => Promise.resolve({ scenario: {} as never }) }), {
-      runWithTraceCtx: (carrier, fn) => {
-        seen.push(carrier.marker ?? 'none');
-        return fn();
+    new NodeLink(
+      'n1',
+      host,
+      makeHandlers({ 'node.ready': () => Promise.resolve({ scenario: {} as never }) }),
+      {
+        runWithTraceCtx: (carrier, fn) => {
+          seen.push(carrier.marker ?? 'none');
+          return fn();
+        },
       },
-    });
+    );
     const c = new IpcClient(client, {
       injectTraceCtx: (carrier) => {
         carrier.marker = 'from-client';

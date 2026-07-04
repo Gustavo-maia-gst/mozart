@@ -8,7 +8,12 @@ import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
 import { LATENCY_MODEL, SCHEDULER } from '../tokens';
 import { StorageGate } from './storage-gate';
-import { NodeCrashedError, STORAGE_ADAPTER, type AdapterLease, type StorageAdapter } from './storage-adapter';
+import {
+  NodeCrashedError,
+  STORAGE_ADAPTER,
+  type AdapterLease,
+  type StorageAdapter,
+} from './storage-adapter';
 
 const tracer = trace.getTracer(TRACER_NAME);
 

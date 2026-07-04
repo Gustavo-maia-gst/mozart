@@ -9,7 +9,7 @@ import {
 } from '@mozart/contracts';
 import { ATTR, injectActiveContext, runWithExtractedContext, TRACER_NAME } from '@mozart/telemetry';
 import type { LatencyModel } from '@mozart/latency';
-import type { Clock, Scheduler } from '../clock/clock';
+import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
 import { TransportService } from '../transport/transport.service';
 import { LATENCY_MODEL, SCENARIO, SCHEDULER } from '../tokens';

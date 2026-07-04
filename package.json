@@ -15,7 +15,7 @@
     "test:integration": "MOZART_INTEGRATION=1 vitest run",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "demo": "pnpm build && node apps/master/dist/main.js --scenario scenarios/echo-smoke.yaml"
+    "demo": "pnpm build && node apps/master/dist/main.js --scenario scenarios/echo-chaos.yaml"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

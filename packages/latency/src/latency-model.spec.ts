@@ -28,8 +28,8 @@ describe('LatencyModel', () => {
   it('streams are independent per action type', () => {
     // Adding/consuming one action must not shift another's sequence.
     const config: Record<string, DistributionConfig> = {
-      'a': { distribution: 'normal', mean: 10, stddev: 3 },
-      'b': { distribution: 'normal', mean: 10, stddev: 3 },
+      a: { distribution: 'normal', mean: 10, stddev: 3 },
+      b: { distribution: 'normal', mean: 10, stddev: 3 },
     };
     const withB = new LatencyModel('s', config);
     const aWithBDraws = [withB.sample('b'), withB.sample('b'), withB.sample('a')].at(-1);
