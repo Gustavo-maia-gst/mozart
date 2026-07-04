@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EventLogModule } from '../event-log/event-log.module';
+import { DeliveryModule } from '../ipc-server/delivery.module';
 import { NetworkState } from './delivery-sink';
 import { TransportService } from './transport.service';
 
@@ -9,7 +10,7 @@ import { TransportService } from './transport.service';
  * transport's own providers and re-exports NetworkState for the fault injector.
  */
 @Module({
-  imports: [EventLogModule],
+  imports: [EventLogModule, DeliveryModule],
   providers: [TransportService, NetworkState],
   exports: [TransportService, NetworkState],
 })
