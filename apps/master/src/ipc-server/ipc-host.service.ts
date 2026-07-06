@@ -57,6 +57,9 @@ export class IpcHostService {
         await this.storage.save(nodeId, taskId, data);
         return {};
       },
+      'storage.delete': async (nodeId, { query }) => ({
+        deleted: await this.storage.delete(nodeId, query),
+      }),
       'storage.lease.save': async (_nodeId, { leaseId, data }) => {
         await this.storage.leaseSave(leaseId, data);
         return {};

@@ -6,9 +6,7 @@
   "graphTooltip": 1,
   "title": "Mozart — Protocol comparison",
   "uid": "mozart-protocol-comparison",
-  "tags": [
-    "mozart"
-  ],
+  "tags": ["mozart"],
   "schemaVersion": 39,
   "time": {
     "from": "now-7d",

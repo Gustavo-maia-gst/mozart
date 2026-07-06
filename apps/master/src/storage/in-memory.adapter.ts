@@ -24,6 +24,17 @@ export class InMemoryStorageAdapter implements StorageAdapter {
     return Promise.resolve();
   }
 
+  public delete(query: StorageQuery): Promise<number> {
+    let deleted = 0;
+    for (const [taskId, data] of this.store) {
+      if (matchesQuery(data, query)) {
+        this.store.delete(taskId);
+        deleted++;
+      }
+    }
+    return Promise.resolve(deleted);
+  }
+
   public async acquire(taskId: TaskId, signal: AbortSignal): Promise<AdapterLease> {
     const mutex = this.mutexFor(taskId);
     const releaser = await this.acquireAbortable(mutex, signal);

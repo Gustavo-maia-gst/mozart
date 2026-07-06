@@ -25,6 +25,7 @@ export const EVENT_TYPES = [
   'storage.readExclusive.requested',
   'storage.readExclusive.acquired',
   'storage.save',
+  'storage.delete',
   'storage.lease.released',
   'storage.lease.force-released',
   'storage.outage.begin',

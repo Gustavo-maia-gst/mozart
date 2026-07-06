@@ -13,7 +13,7 @@ import {
 } from '@mozart/contracts';
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { DependencyFrontierProtocol } from './dependency_frontier';
+import { MonotonicDependencyFrontierProtocol } from './monotonic_dependency_frontier';
 
 // Diamond DAG: a -> {b, c} -> d.
 const graph = buildGraph('g0', [
@@ -23,6 +23,7 @@ const graph = buildGraph('g0', [
   { id: 'd', dependsOn: ['b', 'c'] },
 ]);
 
+/** In-memory S with the real match rule (scalar = eq, array = IN) and delete-by-WHERE. */
 const store = new Map<string, TaskState>();
 const matches = (data: TaskState, query: StorageQuery): boolean =>
   Object.entries(query).every(([k, v]) => (Array.isArray(v) ? v.includes(data[k] as never) : data[k] === v));
@@ -71,29 +72,39 @@ const fakeTransport: TransportPort = {
   },
 };
 
-async function makeProtocol(): Promise<DependencyFrontierProtocol> {
+async function makeProtocol(): Promise<MonotonicDependencyFrontierProtocol> {
   const moduleRef = await Test.createTestingModule({
     providers: [
-      DependencyFrontierProtocol,
+      MonotonicDependencyFrontierProtocol,
       { provide: StoragePort, useValue: fakeStorage },
       { provide: TransportPort, useValue: fakeTransport },
       { provide: ProtocolLogger, useValue: { debug() {}, info() {}, warn() {}, error() {} } },
     ],
   }).compile();
-  return moduleRef.get(DependencyFrontierProtocol);
+  return moduleRef.get(MonotonicDependencyFrontierProtocol);
 }
 
 const success = (taskId: string): WorkerSuccessEvent => ({ taskId });
 const fail = (taskId: string): WorkerFailEvent => ({ taskId });
 
-describe('DependencyFrontierProtocol', () => {
+describe('MonotonicDependencyFrontierProtocol', () => {
   beforeEach(() => {
     store.clear();
     started.length = 0;
     completedGraph = undefined;
   });
 
-  it('starts only the roots', async () => {
+  it('persists tasks (with dependents) and one edge record per dependency', async () => {
+    const p = await makeProtocol();
+    await p.persistGraph(graph);
+    expect(store.get('a')).toMatchObject({ kind: 'task', dependents: ['b', 'c'], status: 'pending' });
+    expect(store.get('d')).toMatchObject({ dependents: [] });
+    // Dependency edges dep -> dependent, keyed edge:src->tgt.
+    expect(store.get('edge:a->b')).toEqual({ kind: 'edge', graphId: 'g0', source: 'a', target: 'b' });
+    expect(store.get('edge:b->d')).toMatchObject({ source: 'b', target: 'd' });
+  });
+
+  it('starts only the roots (tasks no edge targets)', async () => {
     const p = await makeProtocol();
     await p.persistGraph(graph);
     await p.startGraph('g0');
@@ -105,24 +116,46 @@ describe('DependencyFrontierProtocol', () => {
     await p.persistGraph(graph);
     await p.startGraph('g0');
 
-    await p.onWorkerSuccess(success('a'));
+    await p.onWorkerSuccess(success('a')); // consumes a->b, a->c → both unblocked
     expect(started).toEqual(['a', 'b', 'c']);
-    await p.onWorkerSuccess(success('b'));
-    expect(started).toEqual(['a', 'b', 'c']); // d still needs c
-    await p.onWorkerSuccess(success('c'));
+    await p.onWorkerSuccess(success('b')); // consumes b->d, but c->d still blocks d
+    expect(started).toEqual(['a', 'b', 'c']);
+    await p.onWorkerSuccess(success('c')); // consumes c->d → d unblocked
     expect(started).toEqual(['a', 'b', 'c', 'd']);
   });
 
-  it('completes the graph once every task is done', async () => {
+  it('consumes edges as sources complete', async () => {
+    const p = await makeProtocol();
+    await p.persistGraph(graph);
+    await p.startGraph('g0');
+    await p.onWorkerSuccess(success('a'));
+    expect(store.has('edge:a->b')).toBe(false);
+    expect(store.has('edge:a->c')).toBe(false);
+    expect(store.has('edge:b->d')).toBe(true); // b not done yet
+  });
+
+  it('completes the graph once the last (leaf) task finishes', async () => {
     const p = await makeProtocol();
     await p.persistGraph(graph);
     await p.startGraph('g0');
     await p.onWorkerSuccess(success('a'));
     await p.onWorkerSuccess(success('b'));
     await p.onWorkerSuccess(success('c'));
-    expect(completedGraph).toBeUndefined();
+    expect(completedGraph).toBeUndefined(); // d not done yet
     await p.onWorkerSuccess(success('d'));
     expect(completedGraph).toBe('g0');
+  });
+
+  it('is idempotent: a duplicated completion never starts a task with unmet deps', async () => {
+    const p = await makeProtocol();
+    await p.persistGraph(graph);
+    await p.startGraph('g0');
+    await p.onWorkerSuccess(success('a'));
+    await p.onWorkerSuccess(success('a')); // duplicate / redelivery
+    await p.onWorkerSuccess(success('b'));
+    await p.onWorkerSuccess(success('b')); // duplicate
+    expect(started).not.toContain('d'); // d needs both b and c
+    expect(new Set(started)).toEqual(new Set(['a', 'b', 'c']));
   });
 
   it('retries a failed task by re-dispatching it', async () => {
@@ -130,6 +163,6 @@ describe('DependencyFrontierProtocol', () => {
     await p.persistGraph(graph);
     await p.startGraph('g0');
     await p.onWorkerFail(fail('a'));
-    expect(started).toEqual(['a', 'a']);
+    expect(started).toEqual(['a', 'a']); // re-dispatched
   });
 });

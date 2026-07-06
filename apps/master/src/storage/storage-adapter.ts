@@ -52,9 +52,11 @@ export interface AdapterLease {
  */
 export interface StorageAdapter {
   read(taskId: TaskId): Promise<TaskState | null>;
-  /** Return every stored task whose state matches `query` by attribute equality. */
+  /** Return every stored task whose state matches `query` (see {@link matchesQuery}). */
   find(query: StorageQuery): Promise<TaskMatch[]>;
   save(taskId: TaskId, data: TaskState): Promise<void>;
+  /** Remove every record matching `query`; returns the number removed. */
+  delete(query: StorageQuery): Promise<number>;
   /**
    * Acquire the exclusive lock for `taskId`, blocking until granted. If
    * `signal` aborts while blocked, the acquisition is cancelled and the promise

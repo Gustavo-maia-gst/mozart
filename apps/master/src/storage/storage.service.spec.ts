@@ -130,4 +130,17 @@ describe('StorageService (in-memory)', () => {
     // An empty IN list matches nothing.
     expect(await service.find('n1', { taskId: [] })).toHaveLength(0);
   });
+
+  it('delete removes every record matching the query (by WHERE), returning the count', async () => {
+    const { service } = ctx;
+    await service.save('n1', 'edge:a->b', { kind: 'edge', source: 'a', target: 'b' });
+    await service.save('n1', 'edge:a->c', { kind: 'edge', source: 'a', target: 'c' });
+    await service.save('n1', 'edge:b->d', { kind: 'edge', source: 'b', target: 'd' });
+
+    const deleted = await service.delete('n1', { kind: 'edge', source: 'a' });
+    expect(deleted).toBe(2);
+    expect(await service.read('n1', 'edge:a->b')).toBeNull();
+    expect(await service.read('n1', 'edge:b->d')).not.toBeNull(); // untouched
+    expect(await service.delete('n1', { kind: 'edge', source: 'a' })).toBe(0); // idempotent
+  });
 });

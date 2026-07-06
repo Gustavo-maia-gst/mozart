@@ -73,6 +73,17 @@ export class StorageService {
     this.metrics.countStorageOp('save');
   }
 
+  public async delete(nodeId: NodeId, query: StorageQuery): Promise<number> {
+    await this.gate.pass(nodeId);
+    const ms = this.latency.sample('storage.delete');
+    this.metrics.observeStorageOpDuration('delete', ms);
+    await this.sleep(ms);
+    const deleted = await this.adapter.delete(query);
+    this.events.record({ type: 'storage.delete', nodeId, data: { query, deleted } });
+    this.metrics.countStorageOp('delete');
+    return deleted;
+  }
+
   public async readExclusive(nodeId: NodeId, taskId: TaskId): Promise<ExclusiveReadResult> {
     await this.gate.pass(nodeId);
     this.events.record({ type: 'storage.readExclusive.requested', nodeId, taskId });

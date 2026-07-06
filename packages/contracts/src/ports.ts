@@ -77,6 +77,12 @@ export abstract class StoragePort {
    */
   public abstract readExclusive(taskId: TaskId): Promise<ExclusiveRead>;
   public abstract save(taskId: TaskId, data: TaskState): Promise<void>;
+  /**
+   * Remove every record matching `query` (same match rule as {@link find}:
+   * scalar = equality, array = IN). Returns the number removed. No locking, like
+   * `find`; idempotent (a query matching nothing removes nothing).
+   */
+  public abstract delete(query: StorageQuery): Promise<number>;
 }
 
 export interface ExclusiveRead<TTask = TaskState> {

@@ -29,6 +29,7 @@ const storage: StoragePort = {
     return Promise.resolve();
   },
   readExclusive: () => Promise.reject(new Error('baseline does not lock')),
+  delete: () => Promise.resolve(0),
 };
 // The baseline dispatches tasks via the transport's sendToWorkerPool; record
 // the task ids it hands off so the tests can assert the DAG ordering.

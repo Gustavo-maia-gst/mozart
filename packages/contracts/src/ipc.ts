@@ -54,6 +54,7 @@ export const rpcPayloadSchemas = {
   'storage.find': z.object({ query: jsonObjectSchema }),
   'storage.readExclusive': z.object({ taskId: z.string().min(1) }),
   'storage.save': z.object({ taskId: z.string().min(1), data: jsonObjectSchema }),
+  'storage.delete': z.object({ query: jsonObjectSchema }),
   'storage.lease.save': z.object({ leaseId: z.string().min(1), data: jsonObjectSchema }),
   'storage.lease.release': z.object({ leaseId: z.string().min(1) }),
 } as const;
@@ -74,6 +75,7 @@ export interface RpcContracts {
     res: { leaseId: string; data: TaskState | null };
   };
   'storage.save': { req: { taskId: string; data: TaskState }; res: Record<string, never> };
+  'storage.delete': { req: { query: StorageQuery }; res: { deleted: number } };
   'storage.lease.save': { req: { leaseId: string; data: TaskState }; res: Record<string, never> };
   'storage.lease.release': { req: { leaseId: string }; res: Record<string, never> };
 }

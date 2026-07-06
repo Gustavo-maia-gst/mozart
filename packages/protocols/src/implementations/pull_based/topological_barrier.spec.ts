@@ -47,6 +47,7 @@ const fakeStorage: StoragePort = {
       },
       release: () => Promise.resolve(),
     }),
+  delete: () => Promise.resolve(0),
 };
 
 // Record dispatches to W and coordinator messages so tests can assert ordering.

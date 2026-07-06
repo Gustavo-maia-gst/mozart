@@ -7,6 +7,7 @@ export const KNOWN_LATENCY_ACTIONS = [
   'storage.read',
   'storage.readExclusive',
   'storage.save',
+  'storage.delete',
   'storage.find',
   'worker.taskDuration',
 ] as const;

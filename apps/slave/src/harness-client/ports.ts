@@ -62,6 +62,12 @@ export class StorageClient implements StoragePort {
     await this.ipc.call('storage.save', { taskId, data });
   }
 
+  @Trace({ name: 'storage.delete', kind: SpanKind.CLIENT })
+  public async delete(query: StorageQuery): Promise<number> {
+    const { deleted } = await this.ipc.call('storage.delete', { query });
+    return deleted;
+  }
+
   @Trace({ name: (taskId) => `storage.readExclusive(${taskId})`, kind: SpanKind.CLIENT })
   public async readExclusive(taskId: TaskId): Promise<ExclusiveRead> {
     const r = await this.ipc.call('storage.readExclusive', { taskId });

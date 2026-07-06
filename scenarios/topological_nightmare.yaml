@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=./scenario.schema.json
+# Centralized baseline over a diamond DAG: a -> {b, c} -> d.
+# One coordinator loads the graph into memory and drives it from completions.
+name: topological-nightmare
+seed: 1
+protocol: baseline
+nodes: [{ id: n1, name: coordinator }]
+graphs:
+  - id: g0
+    tasks:
+      - { id: a, costMs: 10 }
+      - { id: b, costMs: 200 }
+      - { id: c, dependsOn: [a], costMs: 200 }
+      - { id: d, dependsOn: [b], costMs: 10 }
+      - { id: e, dependsOn: [c], costMs: 200 }
+      - { id: f, dependsOn: [d], costMs: 10 }
+      - { id: g, dependsOn: [f], costMs: 200 }
+      - { id: h, dependsOn: [e], costMs: 10 }
+storage: { adapter: in-memory }
+transport: { ackTimeoutMs: 2000 }
+latency:
+  transport.deliver: { distribution: constant, value: 10 }
+  storage.read: { distribution: constant, value: 5 }
+  storage.save: { distribution: constant, value: 5 }
+endCondition: { type: timeout, ms: 1500 }

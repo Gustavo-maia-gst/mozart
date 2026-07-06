@@ -6,6 +6,30 @@ const UPSERT = `insert into task_state(task_id, data, version) values ($1, $2, 0
   on conflict (task_id) do update set data = excluded.data, version = task_state.version + 1`;
 
 /**
+ * Build the SQL WHERE clause + bound params for a {@link StorageQuery}. Scalar
+ * attributes go through jsonb containment (@>), which is attribute-equality and
+ * can use a GIN index on data. Array-valued attributes are IN filters:
+ * `data->>key = ANY(list)` (key/list are bound params, never interpolated). An
+ * empty query yields `data @> '{}'`, which matches everything.
+ */
+function whereClause(query: StorageQuery): { where: string; params: unknown[] } {
+  const containment: StorageQuery = {};
+  const conds: string[] = [];
+  const params: unknown[] = [];
+  for (const [key, value] of Object.entries(query)) {
+    if (Array.isArray(value)) {
+      params.push(key, value.map(String));
+      conds.push(`data ->> $${params.length - 1} = ANY($${params.length}::text[])`);
+    } else {
+      containment[key] = value;
+    }
+  }
+  params.push(containment);
+  conds.push(`data @> $${params.length}`);
+  return { where: conds.join(' and '), params };
+}
+
+/**
  * Postgres S. Exclusive locks use a dedicated pooled client running
  * `BEGIN; SELECT ... FOR UPDATE`; the master owns all connections, so an
  * explicit lease release (COMMIT/ROLLBACK) is required — advisory session
@@ -39,25 +63,9 @@ export class PostgresStorageAdapter implements StorageAdapter {
   }
 
   public async find(query: StorageQuery): Promise<TaskMatch[]> {
-    // Scalar attributes go through jsonb containment (@>), which is
-    // attribute-equality and can use a GIN index on data. Array-valued
-    // attributes are IN filters: `data->>key = ANY(list)` (key/list are bound
-    // params, never interpolated). An empty query contains everything.
-    const containment: StorageQuery = {};
-    const conds: string[] = [];
-    const params: unknown[] = [];
-    for (const [key, value] of Object.entries(query)) {
-      if (Array.isArray(value)) {
-        params.push(key, value.map(String));
-        conds.push(`data ->> $${params.length - 1} = ANY($${params.length}::text[])`);
-      } else {
-        containment[key] = value;
-      }
-    }
-    params.push(containment);
-    conds.push(`data @> $${params.length}`);
+    const { where, params } = whereClause(query);
     const r = await this.pool.query<{ task_id: TaskId; data: TaskState }>(
-      `select task_id, data from task_state where ${conds.join(' and ')}`,
+      `select task_id, data from task_state where ${where}`,
       params,
     );
     return r.rows.map((row) => ({ taskId: row.task_id, data: row.data }));
@@ -65,6 +73,12 @@ export class PostgresStorageAdapter implements StorageAdapter {
 
   public async save(taskId: TaskId, data: TaskState): Promise<void> {
     await this.pool.query(UPSERT, [taskId, data]);
+  }
+
+  public async delete(query: StorageQuery): Promise<number> {
+    const { where, params } = whereClause(query);
+    const r = await this.pool.query(`delete from task_state where ${where}`, params);
+    return r.rowCount ?? 0;
   }
 
   public async acquire(taskId: TaskId, signal: AbortSignal): Promise<AdapterLease> {

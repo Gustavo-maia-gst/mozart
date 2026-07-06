@@ -19,6 +19,7 @@ function resolveScenarioPath(arg: string | undefined, protocol: string | undefin
   return `scenarios/${name}.yaml`;
 }
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: bootstrap
 async function bootstrap(): Promise<void> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,

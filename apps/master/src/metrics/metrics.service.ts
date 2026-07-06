@@ -4,7 +4,7 @@ import { type Counter, type Histogram, metrics, type UpDownCounter } from '@open
 
 /** Bounded label values — kept small on purpose (cardinality discipline). */
 export type MessageType = 'published' | 'delivered' | 'redelivered' | 'duplicated' | 'acked' | 'blocked';
-export type StorageOp = 'read' | 'find' | 'save' | 'readExclusive';
+export type StorageOp = 'read' | 'find' | 'save' | 'readExclusive' | 'delete';
 export type TaskOutcome = 'started' | 'completed' | 'failed' | 'duplicate-start' | 'premature-start';
 export type FaultAction = 'killNode' | 'storageOutage' | 'partitionNode' | 'duplicateDeliveries' | 'failTask';
 export type NodeLifecycle = 'spawned' | 'ready' | 'killed' | 'exited' | 'restarted';

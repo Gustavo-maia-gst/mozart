@@ -35,6 +35,9 @@ class MasterStorage extends StoragePort {
   public readExclusive(): Promise<never> {
     throw new Error('readExclusive is not available to the master persist-only protocol');
   }
+  public delete(): Promise<never> {
+    throw new Error('delete is not available to the master persist-only protocol');
+  }
 }
 
 /** The persist-only protocol instance never sends — persistGraph is setup, not coordination. */
