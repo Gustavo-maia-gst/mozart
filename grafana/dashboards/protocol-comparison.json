@@ -18,6 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
+  "id": 1,
   "links": [],
   "panels": [
     {
@@ -41,7 +42,11 @@
       "description": "makespan − critical-path cost: the overhead the protocol adds on top of the theoretical floor.",
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -60,7 +65,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 6,
+        "w": 7,
         "x": 0,
         "y": 1
       },
@@ -76,7 +81,7 @@
         "maxVizHeight": 300,
         "minVizHeight": 16,
         "minVizWidth": 8,
-        "namePlacement": "auto",
+        "namePlacement": "top",
         "orientation": "horizontal",
         "reduceOptions": {
           "calcs": ["lastNotNull"],
@@ -85,7 +90,7 @@
         },
         "showUnfilled": true,
         "sizing": "auto",
-        "valueMode": "color"
+        "valueMode": "text"
       },
       "pluginVersion": "11.6.0",
       "targets": [
@@ -108,7 +113,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "continuous-RdYlGr"
           },
           "custom": {
             "axisBorderShow": false,
@@ -116,8 +121,8 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
+            "fillOpacity": 100,
+            "gradientMode": "opacity",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
@@ -163,8 +168,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 6,
-        "x": 6,
+        "w": 7,
+        "x": 7,
         "y": 1
       },
       "id": 3,
@@ -179,9 +184,9 @@
           "placement": "bottom",
           "showLegend": true
         },
-        "orientation": "auto",
+        "orientation": "horizontal",
         "showValue": "auto",
-        "stacking": "normal",
+        "stacking": "percent",
         "tooltip": {
           "hideZeros": false,
           "mode": "multi",
@@ -237,7 +242,11 @@
       },
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -256,8 +265,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 6,
-        "x": 12,
+        "w": 5,
+        "x": 14,
         "y": 1
       },
       "id": 4,
@@ -302,7 +311,11 @@
       },
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -321,8 +334,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 6,
-        "x": 18,
+        "w": 5,
+        "x": 19,
         "y": 1
       },
       "id": 5,
@@ -367,226 +380,6 @@
         "w": 24,
         "x": 0,
         "y": 9
-      },
-      "id": 6,
-      "panels": [],
-      "title": "Latency distributions (native histograms)",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 10
-      },
-      "id": 7,
-      "options": {
-        "displayMode": "gradient",
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.5, sum by (mozart_protocol) (last_over_time(mozart_worker_task_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
-          "instant": true,
-          "legendFormat": "{{mozart_protocol}} p50",
-          "refId": "p50"
-        },
-        {
-          "expr": "histogram_quantile(0.95, sum by (mozart_protocol) (last_over_time(mozart_worker_task_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
-          "instant": true,
-          "legendFormat": "{{mozart_protocol}} p95",
-          "refId": "p95"
-        }
-      ],
-      "title": "Worker task duration p50/p95 (ms)",
-      "type": "bargauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 10
-      },
-      "id": 8,
-      "options": {
-        "displayMode": "gradient",
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.5, sum by (mozart_protocol) (last_over_time(mozart_transport_deliver_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
-          "instant": true,
-          "legendFormat": "{{mozart_protocol}} p50",
-          "refId": "p50"
-        },
-        {
-          "expr": "histogram_quantile(0.95, sum by (mozart_protocol) (last_over_time(mozart_transport_deliver_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
-          "instant": true,
-          "legendFormat": "{{mozart_protocol}} p95",
-          "refId": "p95"
-        }
-      ],
-      "title": "Transport deliver latency p50/p95 (ms)",
-      "type": "bargauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 10
-      },
-      "id": 9,
-      "options": {
-        "displayMode": "gradient",
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum by (mozart_protocol, op) (last_over_time(mozart_storage_op_duration_milliseconds{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\", mozart_nodes=~\"$nodes\", mozart_latency_transport_deliver_mean=~\"$comms\", mozart_latency_storage_save_mean=~\"$storage\"}[$__range])))",
-          "instant": true,
-          "legendFormat": "{{mozart_protocol}} / {{op}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Storage op latency p95 by op (ms)",
-      "type": "bargauge"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 18
       },
       "id": 10,
       "panels": [],
@@ -664,7 +457,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 10
       },
       "id": 11,
       "options": {
@@ -762,7 +555,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 19
       },
       "id": 12,
       "panels": [],
@@ -850,7 +643,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 29
+        "y": 20
       },
       "id": 14,
       "options": {
@@ -995,7 +788,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 29
+        "y": 20
       },
       "id": 16,
       "options": {
@@ -1065,11 +858,11 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 29
       },
       "id": 17,
       "panels": [],
-      "title": "Cost vs fan-in (join width) — one line per protocol",
+      "title": "Cost vs avg(fan-in+fan-out)",
       "type": "row"
     },
     {
@@ -1149,7 +942,7 @@
         "h": 9,
         "w": 8,
         "x": 0,
-        "y": 39
+        "y": 30
       },
       "id": 18,
       "options": {
@@ -1313,7 +1106,7 @@
         "h": 9,
         "w": 8,
         "x": 8,
-        "y": 39
+        "y": 30
       },
       "id": 19,
       "options": {
@@ -1477,7 +1270,7 @@
         "h": 9,
         "w": 8,
         "x": 16,
-        "y": 39
+        "y": 30
       },
       "id": 20,
       "options": {
@@ -1565,19 +1358,6 @@
       "type": "trend"
     },
     {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 48
-      },
-      "id": 21,
-      "panels": [],
-      "title": "Cost vs fan-out (branch width) — one line per protocol",
-      "type": "row"
-    },
-    {
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1654,7 +1434,7 @@
         "h": 9,
         "w": 8,
         "x": 0,
-        "y": 49
+        "y": 39
       },
       "id": 22,
       "options": {
@@ -1818,7 +1598,7 @@
         "h": 9,
         "w": 8,
         "x": 8,
-        "y": 49
+        "y": 39
       },
       "id": 23,
       "options": {
@@ -1982,7 +1762,7 @@
         "h": 9,
         "w": 8,
         "x": 16,
-        "y": 49
+        "y": 39
       },
       "id": 24,
       "options": {
@@ -2077,8 +1857,12 @@
   "templating": {
     "list": [
       {
-        "current": {},
+        "current": {
+          "text": "Prometheus",
+          "value": "mozart-prometheus"
+        },
         "name": "datasource",
+        "options": [],
         "query": "prometheus",
         "refresh": 1,
         "type": "datasource"
@@ -2097,6 +1881,7 @@
         "label": "Scenario",
         "multi": true,
         "name": "scenario",
+        "options": [],
         "query": {
           "query": "label_values(mozart_messages_total, mozart_scenario)",
           "refId": "sc"
@@ -2118,6 +1903,7 @@
         "label": "Protocol",
         "multi": true,
         "name": "protocol",
+        "options": [],
         "query": {
           "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_protocol)",
           "refId": "p"
@@ -2139,6 +1925,7 @@
         "label": "Nodes",
         "multi": true,
         "name": "nodes",
+        "options": [],
         "query": {
           "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}, mozart_nodes)",
           "refId": "n"
@@ -2161,6 +1948,7 @@
         "label": "Comms latency mean (ms)",
         "multi": true,
         "name": "comms",
+        "options": [],
         "query": {
           "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_latency_transport_deliver_mean)",
           "refId": "c"
@@ -2182,6 +1970,7 @@
         "label": "Storage latency mean (ms)",
         "multi": true,
         "name": "storage",
+        "options": [],
         "query": {
           "query": "label_values(mozart_messages_total{mozart_scenario=~\"$scenario\"}, mozart_latency_storage_save_mean)",
           "refId": "s"
@@ -2199,5 +1988,5 @@
   "timezone": "",
   "title": "Mozart — Protocol comparison",
   "uid": "mozart-protocol-comparison",
-  "version": 3
+  "version": 14
 }
