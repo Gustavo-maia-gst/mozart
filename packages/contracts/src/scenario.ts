@@ -142,6 +142,13 @@ export const scenarioSchema = z.object({
 export type ScenarioData = z.infer<typeof scenarioSchema>;
 export type GraphSpec = z.infer<typeof graphSchema>;
 
+/**
+ * Protocols whose leader holds the frontier in memory, so the run must use a
+ * single coordinator regardless of the declared node count (see
+ * {@link Scenario.coordinatorIds}).
+ */
+const CENTRALIZED_PROTOCOLS = new Set(['baseline', 'baseline-recoverable']);
+
 /** Slice of the scenario a slave receives at handshake. */
 export interface ScenarioInfo {
   runId: string;
@@ -228,15 +235,15 @@ export class Scenario {
   /**
    * Coordinator node ids (the scenario's `nodes`, excluding the implicit W).
    *
-   * The centralized baseline keeps its frontier in memory in a single leader, so
-   * more than one coordinator would fork the state and break it. For that
-   * protocol we ignore the declared node count and collapse to a single
-   * coordinator — every consumer (spawn, ready-check, the peer list handed to
-   * slaves) routes through here, so the whole run sees just one.
+   * The centralized protocols keep their frontier in one leader's memory, so
+   * more than one coordinator would fork the state and break it. For those we
+   * ignore the declared node count and collapse to a single coordinator — every
+   * consumer (spawn, ready-check, the peer list handed to slaves) routes through
+   * here, so the whole run sees just one.
    */
   coordinatorIds(): string[] {
     const ids = this.data.nodes.map((n) => n.id);
-    return this.data.protocol === 'baseline' ? ids.slice(0, 1) : ids;
+    return CENTRALIZED_PROTOCOLS.has(this.data.protocol) ? ids.slice(0, 1) : ids;
   }
 
   /** A coordinator's display name (drives its OTel service); defaults to its id. */

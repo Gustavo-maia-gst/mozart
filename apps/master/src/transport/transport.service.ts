@@ -44,13 +44,16 @@ interface Pending {
   deliveryId?: string;
   target?: NodeId;
   timer?: CancelHandle;
-  /** No live coordinator to take it — parked until {@link resumeAll}. */
+  /** True while no coordinator was reachable; retried on a backoff (also {@link resumeAll}). */
   blocked: boolean;
   /** Extra copies to emit on the next successful delivery (fault). */
   duplicateBudget: number;
   /** Lifetime span for the time spent queued awaiting first delivery; ended then. */
   queueSpan?: Span;
 }
+
+/** Backoff before retrying a message that found no reachable coordinator. */
+const NO_COORDINATOR_BACKOFF_MS = 25;
 
 /**
  * The message fabric. There is no point-to-point addressing: coordinators are
@@ -226,12 +229,17 @@ export class TransportService {
   private dispatch(messageId: string, redelivery: boolean): void {
     const msg = this.messages.get(messageId);
     if (!msg) return;
+    // Drop any pending timer (backoff or visibility) so we never run two at once.
+    if (msg.timer) this.scheduler.cancel(msg.timer);
 
     const target = this.pickTarget();
     if (target === undefined) {
+      // No coordinator reachable right now. Don't park indefinitely — one will
+      // come back (spawn / restart / partition heal), so retry after a backoff.
       msg.blocked = true;
       this.events.record({ type: 'transport.blocked', messageId: msg.messageId });
       this.metrics.countMessage('blocked');
+      msg.timer = this.scheduler.after(NO_COORDINATOR_BACKOFF_MS, () => this.dispatch(messageId, msg.attempts > 0));
       return;
     }
     msg.blocked = false;

@@ -167,8 +167,9 @@ export class MonotonicDependencyFrontierProtocol extends Protocol {
 
   /** Signal end-of-graph once all tasks are complete (guarded to fire exactly once). */
   private async maybeFinish(graphId: GraphId): Promise<void> {
-    const tasks = await this.storage.find({ kind: TASK_KIND, graphId });
-    if (!tasks.every((t) => (t.data as TaskRecord).status === 'complete')) return;
+    // Inverse select: any task still pending/running means the graph isn't done.
+    const unfinished = await this.storage.find({ kind: TASK_KIND, graphId, status: ['pending', 'running'] });
+    if (unfinished.length > 0) return;
     const ex = await this.storage.readExclusive(this.metaKey(graphId));
     if ((ex.data as MetaRecord | null)?.completed) {
       await ex.release();

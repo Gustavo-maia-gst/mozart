@@ -28,18 +28,26 @@ interface TaskRecord extends JsonObject {
 
 const TASK_KIND = 'task';
 
+/** Coordinator→coordinator announcement: a task completed; advance its dependents. */
+const FINISHED_TOPIC = 'task.finished';
+interface FinishedBody extends JsonObject {
+  taskId: TaskId;
+}
+
 /**
  * Dependency-frontier protocol (pull-based) — the naive, unhardened reference
  * implementation, kept as a research baseline to measure what the hardening in
  * {@link MonotonicDependencyFrontierProtocol} actually buys.
  *
  * Frontier semantics: a task runs once all its own dependencies are complete
- * (finer than the topological barrier, same as the baseline). Implemented the
- * obvious way, with none of the distributed safety machinery:
+ * (finer than the topological barrier, same as the baseline). Completions are
+ * announced with a `task.finished` message; whichever coordinator picks it up
+ * advances the frontier. Implemented the obvious way, with none of the
+ * distributed safety machinery:
  *  - **no exclusive locks** — plain `read` + `save`, so concurrent coordinators
  *    can race on the same record (lost updates, double dispatch);
- *  - **no edge records / delete** — a dependent's readiness is recomputed by
- *    reading every one of its dependencies each time;
+ *  - **no edge records / delete** — a dependent's readiness is recomputed with a
+ *    single `find` over its dependencies each time;
  *  - **no completion guard** — the whole-graph check runs on *every* completion
  *    (O(tasks) each) and `completeGraph` may fire more than once.
  *
@@ -78,18 +86,27 @@ export class DependencyFrontierProtocol extends Protocol {
     }
   }
 
-  /** This protocol coordinates purely through S; it exchanges no messages. */
+  /** A `task.finished` announcement: advance the finished task's dependents. */
   public override async onMessage(event: Message): Promise<void> {
-    this.log.warn('unexpected coordinator message', { topic: event.topic });
+    if (event.topic !== FINISHED_TOPIC) {
+      this.log.warn('unexpected coordinator message', { topic: event.topic });
+      return;
+    }
+    const { taskId } = event.body as FinishedBody;
+    const record = (await this.storage.read(taskId)) as TaskRecord | null;
+    if (!record) return;
+    // One select brings every dependent record (instead of a read per dependent).
+    const dependents = await this.storage.find({ kind: TASK_KIND, graphId: record.graphId, taskId: record.dependents });
+    for (const { data } of dependents) await this.tryStart(data as TaskRecord);
+    await this.maybeFinish(record.graphId);
   }
 
-  /** A task finished: mark it complete, then start every dependent whose deps are all done. */
+  /** A task finished: mark it complete, then announce it so a coordinator advances its dependents. */
   public override async onWorkerSuccess(event: WorkerSuccessEvent): Promise<void> {
     const record = (await this.storage.read(event.taskId)) as TaskRecord | null;
     if (!record) return; // unknown task → ack, no-op
     await this.storage.save(event.taskId, { ...record, status: 'complete' });
-    for (const dependent of record.dependents) await this.tryStart(dependent);
-    await this.maybeFinish(record.graphId);
+    await this.transport.sendToCoordinators(FINISHED_TOPIC, { taskId: event.taskId } satisfies FinishedBody);
   }
 
   /** A failed task is retried by re-dispatching it. */
@@ -100,12 +117,17 @@ export class DependencyFrontierProtocol extends Protocol {
     await this.transport.sendToWorkerPool(event.taskId);
   }
 
-  /** Start `dependent` iff every one of its dependencies is complete (checked by reading each). */
-  private async tryStart(dependent: TaskId): Promise<void> {
-    const record = (await this.storage.read(dependent)) as TaskRecord | null;
-    if (record?.status !== 'pending') return;
-    const deps = await Promise.all(record.deps.map((dep) => this.storage.read(dep)));
-    if (deps.every((d) => (d as TaskRecord | null)?.status === 'complete')) await this.startTask(dependent);
+  /** Start `dependent` iff every one of its dependencies is complete — one select brings them all. */
+  private async tryStart(dependent: TaskRecord): Promise<void> {
+    if (dependent.status !== 'pending') return;
+    // Single query: the dependencies (by id) that are already complete.
+    const done = await this.storage.find({
+      kind: TASK_KIND,
+      graphId: dependent.graphId,
+      taskId: dependent.deps,
+      status: 'complete',
+    });
+    if (done.length === dependent.deps.length) await this.startTask(dependent.taskId);
   }
 
   /** Move a task to running and send it to W — no lock, so a race can dispatch twice (W dedupes). */
