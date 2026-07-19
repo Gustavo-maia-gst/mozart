@@ -6,7 +6,13 @@ import { type Counter, type Histogram, metrics, type UpDownCounter } from '@open
 export type MessageType = 'published' | 'delivered' | 'redelivered' | 'duplicated' | 'acked' | 'blocked';
 export type StorageOp = 'read' | 'find' | 'save' | 'readExclusive' | 'delete';
 export type TaskOutcome = 'started' | 'completed' | 'failed' | 'duplicate-start' | 'premature-start';
-export type FaultAction = 'killNode' | 'storageOutage' | 'partitionNode' | 'duplicateDeliveries' | 'failTask';
+export type FaultAction =
+  | 'killNode'
+  | 'storageOutage'
+  | 'partitionNode'
+  | 'duplicateDeliveries'
+  | 'failTask'
+  | 'conditionalKill';
 export type NodeLifecycle = 'spawned' | 'ready' | 'killed' | 'exited' | 'restarted';
 
 /**

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { Scenario, scenarioSchema } from './scenario';
+import { faultSchema, Scenario, scenarioSchema } from './scenario';
 
 const scenariosDir = join(__dirname, '..', '..', '..', 'scenarios');
 
@@ -67,6 +67,68 @@ describe('scenarioSchema', () => {
         endCondition: { type: 'timeout', ms: 1000 },
       }),
     ).toThrow();
+  });
+});
+
+describe('faultSchema — conditionalKill', () => {
+  it('parses a minimal dynamic key into the canonical shape, applying defaults', () => {
+    const data = faultSchema.parse({ failAfterWorkerSuccessMessage: "message.taskId === 'g0-b'" });
+    expect(data).toEqual({
+      action: 'conditionalKill',
+      phase: 'after',
+      hook: 'WorkerSuccessMessage',
+      filter: "message.taskId === 'g0-b'",
+      restartAfterMs: 500,
+      times: 1,
+    });
+  });
+
+  it('parses "before" and honours explicit restartAfterMs/times', () => {
+    const data = faultSchema.parse({
+      failBeforeStorageSave: "message.taskId === 'g1-c'",
+      restartAfterMs: 1000,
+      times: 3,
+    });
+    expect(data).toMatchObject({ action: 'conditionalKill', phase: 'before', hook: 'StorageSave', times: 3 });
+    expect((data as { restartAfterMs: number }).restartAfterMs).toBe(1000);
+  });
+
+  it('still parses the existing timed faults unchanged', () => {
+    expect(faultSchema.parse({ action: 'killNode', at: 0, node: 'n1' })).toEqual({
+      action: 'killNode',
+      at: 0,
+      node: 'n1',
+    });
+  });
+
+  it('rejects a filter with invalid syntax', () => {
+    expect(() => faultSchema.parse({ failAfterStorageSave: 'message.taskId ===' })).toThrow();
+  });
+
+  it('rejects a scenario with neither a fail key nor a recognized action', () => {
+    expect(() => faultSchema.parse({ restartAfterMs: 500 })).toThrow();
+  });
+
+  it('rejects two dynamic fail keys on the same entry', () => {
+    expect(() => faultSchema.parse({ failAfterStorageSave: 'true', failBeforeStorageSave: 'true' })).toThrow();
+  });
+
+  it('rejects an unrecognized hook name', () => {
+    expect(() => faultSchema.parse({ failAfterBogusHook: 'true' })).toThrow();
+  });
+
+  it('accepts a conditionalKill fault inside a full scenario', () => {
+    const data = scenarioSchema.parse({
+      name: 'chaos',
+      seed: 1,
+      protocol: 'baseline',
+      nodes: [{ id: 'n1' }],
+      graphs: [{ id: 'g0', tasks: [{ id: 't1' }] }],
+      storage: { adapter: 'in-memory' },
+      faults: [{ failAfterWorkerSuccessMessage: "message.taskId === 'g0-t1'" }],
+      endCondition: { type: 'timeout', ms: 1000 },
+    });
+    expect(data.faults[0]).toMatchObject({ action: 'conditionalKill', hook: 'WorkerSuccessMessage' });
   });
 });
 

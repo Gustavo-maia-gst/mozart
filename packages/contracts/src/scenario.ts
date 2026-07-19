@@ -79,7 +79,7 @@ export const graphSchema = z.object({
   startAfterMs: z.number().min(0).default(0),
 });
 
-export const faultSchema = z.discriminatedUnion('action', [
+const timedFaultSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('killNode'),
     at: z.number().min(0),
@@ -113,7 +113,94 @@ export const faultSchema = z.discriminatedUnion('action', [
   }),
 ]);
 
+/**
+ * Master choke points a conditional fault can attach to. `*Message` hooks fire
+ * on delivery to a coordinator; the rest fire on the corresponding RPC from a
+ * slave. `WorkerSuccessMessage`/`WorkerFailureMessage` are sugar over
+ * `ReceiveMessage` filtered to the worker-pool's own topics.
+ */
+export const FAULT_HOOKS = [
+  'SendMessage',
+  'SendToWorker',
+  'StorageRead',
+  'StorageReadExclusive',
+  'StorageSave',
+  'StorageFind',
+  'StorageDelete',
+  'ReceiveMessage',
+  'WorkerSuccessMessage',
+  'WorkerFailureMessage',
+] as const;
+
+export type FaultHook = (typeof FAULT_HOOKS)[number];
+
+/** Every valid dynamic key, e.g. `failAfterWorkerSuccessMessage`. */
+const CONDITIONAL_KILL_KEYS = FAULT_HOOKS.flatMap((hook) => [`failBefore${hook}`, `failAfter${hook}`] as const);
+
+/**
+ * Throws (SyntaxError) if `expr` isn't a valid JS expression body. `expr` is a
+ * trusted research-harness scenario input, evaluated master-side only —
+ * compiling it via `new Function` is deliberate.
+ */
+function compileFilterCheck(expr: string): void {
+  new Function('message', 'topic', 'node', 'attempt', `return (${expr});`);
+}
+
+/**
+ * A conditional fault: kills the node involved in a specific action, gated by
+ * a JS expression evaluated against that action's message. Declared as a
+ * single dynamic key `fail(Before|After)<Hook>: "<expression>"`, e.g.
+ * `failAfterWorkerSuccessMessage: "message.taskId === 'g0-b'"`.
+ *
+ * `before` = the node dies before the effect happens (the save never writes,
+ * the message is never sent/delivered). `after` = the effect happens, then
+ * the node dies before seeing the result/ack — the classic non-atomicity
+ * window at-least-once delivery is meant to paper over.
+ */
+const conditionalKillSchema = z
+  .object({
+    restartAfterMs: z.number().positive().default(500),
+    /** How many times this trigger may fire before it's spent. */
+    times: z.number().int().positive().default(1),
+  })
+  .catchall(z.string())
+  .superRefine((val, ctx) => {
+    const matches = CONDITIONAL_KILL_KEYS.filter((k) => k in val);
+    const [matchedKey] = matches;
+    if (matches.length !== 1 || matchedKey === undefined) {
+      ctx.addIssue(
+        `expected exactly one fail(Before|After)<Hook> key (e.g. failAfterWorkerSuccessMessage), found ${matches.length}`,
+      );
+      return;
+    }
+    const filter = val[matchedKey];
+    if (typeof filter !== 'string' || filter.trim() === '') {
+      ctx.addIssue(`${matchedKey} must be a non-empty filter expression string`);
+      return;
+    }
+    try {
+      compileFilterCheck(filter);
+    } catch (err) {
+      ctx.addIssue(`invalid filter expression in ${matchedKey}: ${String(err)}`);
+    }
+  })
+  .transform((val) => {
+    const key = CONDITIONAL_KILL_KEYS.find((k) => k in val) as string;
+    const [, rawPhase, rawHook] = /^fail(Before|After)(.+)$/.exec(key) as RegExpExecArray;
+    return {
+      action: 'conditionalKill' as const,
+      phase: (rawPhase === 'Before' ? 'before' : 'after') as 'before' | 'after',
+      hook: rawHook as FaultHook,
+      filter: val[key] as string,
+      restartAfterMs: val.restartAfterMs,
+      times: val.times,
+    };
+  });
+
+export const faultSchema = z.union([timedFaultSchema, conditionalKillSchema]);
+
 export type FaultSpec = z.infer<typeof faultSchema>;
+export type ConditionalKillFault = Extract<FaultSpec, { action: 'conditionalKill' }>;
 
 export const scenarioSchema = z.object({
   name: z.string().min(1),

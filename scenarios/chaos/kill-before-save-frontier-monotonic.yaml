@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=../scenario.schema.json
+# Chaos demo: monotonic-dependency-frontier survives the same crash cleanly.
+#
+# Same DAG and moment as kill-before-save-frontier-naive.yaml, but this
+# protocol exchanges no coordinator-to-coordinator messages at all — there is
+# no `transport.toCoordinators` call to fault on d's own completion. Instead
+# we kill the coordinator right after it consumes d's outbound edges (a
+# no-op here: d is the sink) but before its completion write lands. The
+# original push is redelivered; `onWorkerSuccess` re-runs while d is still
+# `running` (not yet `complete`), safely redoes the same idempotent
+# transition, and `maybeFinish`'s exclusive completion guard (see
+# monotonic_dependency_frontier.ts) lets `completeGraph` fire exactly once.
+# Look for a single `graph.completed` event for g0 in the JSONL.
+#
+# g1 is an unrelated, long-running task that keeps the run alive well past
+# g0's crash/restart/redelivery storm — see kill-before-save-frontier-naive.yaml
+# for why a single-graph scenario can't observe this at all.
+name: chaos-frontier-monotonic-single-finish
+seed: 1
+protocol: monotonic-dependency-frontier
+nodes: [{ id: n1, name: coordinator }]
+graphs:
+  - id: g0
+    tasks:
+      - { id: a, costMs: 50 }
+      - { id: b, dependsOn: [a], costMs: 50 }
+      - { id: c, dependsOn: [a], costMs: 50 }
+      - { id: d, dependsOn: [b, c], costMs: 50 }
+  - id: g1
+    tasks:
+      - { id: z, costMs: 2500 }
+storage: { adapter: in-memory }
+transport: { ackTimeoutMs: 500 }
+latency:
+  transport.deliver: { distribution: constant, value: 10 }
+  storage.read: { distribution: constant, value: 5 }
+  storage.save: { distribution: constant, value: 5 }
+  storage.find: { distribution: constant, value: 5 }
+  storage.delete: { distribution: constant, value: 5 }
+faults:
+  - failAfterStorageDelete: "message.query.source === 'g0-d'"
+    restartAfterMs: 300
+    times: 1
+endCondition: { type: timeout, ms: 4000 }

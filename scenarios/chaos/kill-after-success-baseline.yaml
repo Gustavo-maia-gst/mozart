@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=../scenario.schema.json
+# Chaos demo: baseline (no fault tolerance) loses the DAG after a crash.
+#
+# The coordinator is killed right as it's about to receive task b's
+# completion (before the push is even delivered — deterministic, no
+# process-timing race). It restarts, but baseline keeps its frontier only in
+# memory (see baseline.ts): the restarted coordinator has no idea b (or the
+# graph at all) ever existed. When b's completion is redelivered after the
+# ack timeout, `onWorkerSuccess` finds an unknown taskId and silently no-ops —
+# 'd' never starts, the graph never completes, and the run only ends via the
+# timeout safety cap. Compare with kill-after-success-recoverable.yaml.
+name: chaos-kill-after-success-baseline
+seed: 1
+protocol: baseline
+nodes: [{ id: n1, name: coordinator }]
+graphs:
+  - id: g0
+    tasks:
+      - { id: a, costMs: 50 }
+      - { id: b, dependsOn: [a], costMs: 50 }
+      - { id: c, dependsOn: [a], costMs: 50 }
+      - { id: d, dependsOn: [b, c], costMs: 50 }
+storage: { adapter: in-memory }
+transport: { ackTimeoutMs: 500 }
+latency:
+  transport.deliver: { distribution: constant, value: 10 }
+  storage.read: { distribution: constant, value: 5 }
+  storage.save: { distribution: constant, value: 5 }
+faults:
+  - failBeforeWorkerSuccessMessage: "message.taskId === 'g0-baax'"
+    restartAfterMs: 300
+    times: 1
+endCondition: { type: timeout, ms: 3000 }

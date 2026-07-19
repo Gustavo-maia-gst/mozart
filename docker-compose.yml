@@ -1,3 +1,5 @@
+name: mozart
+
 services:
   jaeger:
     image: jaegertracing/jaeger:2.9.0
@@ -20,6 +22,8 @@ services:
       test: ['CMD-SHELL', 'pg_isready -U mozart']
       interval: 2s
       retries: 15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   # Metrics backend: ingests OTLP metrics pushed by the master over HTTP
   # (:2090/api/v1/otlp/v1/metrics) and serves them to Grafana. Native histograms
@@ -35,6 +39,9 @@ services:
       - '2090:9090'
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Without this, the TSDB lives on the container's writable layer — any
+      # recreate/restart silently wipes every run's metrics history.
+      - prometheus_data:/prometheus
 
   # Dashboards. Datasource + dashboards provisioned from disk (dashboards as code).
   # Anonymous admin for a zero-login local research tool. Reaches prometheus over
@@ -54,3 +61,12 @@ services:
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      # Grafana's own state (users/prefs/alert state) — dashboards themselves
+      # are provisioned read-only from disk above, this is just the rest of
+      # /var/lib/grafana (grafana.db, plugins) that isn't covered by that.
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:

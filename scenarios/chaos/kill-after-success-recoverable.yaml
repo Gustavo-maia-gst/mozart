@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=../scenario.schema.json
+# Chaos demo: baseline-recoverable survives the exact same crash.
+#
+# Same fault, same DAG, same moment as kill-after-success-baseline.yaml — the
+# coordinator dies right before receiving b's completion. But this protocol
+# writes a redo log before acting (see recoverable_baseline.ts): 'running' was
+# already durable for b when it was dispatched. On restart, the redelivered
+# completion for b finds its WAL entry, `ensureLoaded` rebuilds the frontier
+# from S (a and its redo entries), and the graph completes normally — no
+# lost progress, unlike the plain baseline.
+name: chaos-kill-after-success-recoverable
+seed: 1
+protocol: baseline-recoverable
+nodes: [{ id: n1, name: coordinator }]
+graphs:
+  - id: g0
+    tasks:
+      - { id: a, costMs: 50 }
+      - { id: b, dependsOn: [a], costMs: 50 }
+      - { id: c, dependsOn: [a], costMs: 50 }
+      - { id: d, dependsOn: [b, c], costMs: 50 }
+storage: { adapter: in-memory }
+transport: { ackTimeoutMs: 500 }
+latency:
+  transport.deliver: { distribution: constant, value: 10 }
+  storage.read: { distribution: constant, value: 5 }
+  storage.save: { distribution: constant, value: 5 }
+  storage.find: { distribution: constant, value: 5 }
+faults:
+  - failBeforeWorkerSuccessMessage: "message.taskId === 'g0-b'"
+    restartAfterMs: 300
+    times: 1
+endCondition: { type: timeout, ms: 3000 }

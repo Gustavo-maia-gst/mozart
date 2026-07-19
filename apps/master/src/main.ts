@@ -1,4 +1,7 @@
+import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { extname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { fanStats } from '@mozart/contracts';
 import { initTelemetry } from '@mozart/telemetry';
@@ -7,16 +10,60 @@ import { latencyResourceAttrs } from './metrics/resource-attrs';
 import { loadScenario } from './scenario/scenario';
 
 /**
- * Resolves the scenario file to run. An explicit arg is used as a path when it
- * looks like one (has a slash or a `.y(a)ml` extension), else as a name under
- * `scenarios/`. With no arg it defaults to the protocol's own file. Returns
- * undefined when neither a scenario nor a protocol was provided.
+ * Resolves the scenario file (or directory) to run. An explicit arg is used as
+ * a path when it looks like one (has a slash or a `.y(a)ml` extension), else
+ * as a name under `scenarios/`. With no arg it defaults to the protocol's own
+ * file. Returns undefined when neither a scenario nor a protocol was provided.
  */
 function resolveScenarioPath(arg: string | undefined, protocol: string | undefined): string | undefined {
   const name = arg ?? protocol;
   if (!name) return undefined;
   if (name.includes('/') || name.endsWith('.yaml') || name.endsWith('.yml')) return name;
   return `scenarios/${name}.yaml`;
+}
+
+/** Every `.yaml`/`.yml` file directly under `dir`, sorted for a deterministic run order. */
+function scenarioFilesIn(dir: string): string[] {
+  return readdirSync(dir)
+    .filter((f) => extname(f) === '.yaml' || extname(f) === '.yml')
+    .sort((a, b) => a.localeCompare(b))
+    .map((f) => join(dir, f));
+}
+
+/**
+ * Re-invokes this same script (`node dist/main.js --scenario <file>`) as a
+ * child process. One process per scenario, run sequentially: OTel's global
+ * tracer/meter providers are "first registration wins", so looping several
+ * scenarios' `initTelemetry()` calls in one process would silently break
+ * telemetry from the second run on — a fresh process sidesteps that.
+ */
+function runInChildProcess(scenarioPath: string, extraArgs: string[]): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [process.argv[1] as string, '--scenario', scenarioPath, ...extraArgs], {
+      stdio: 'inherit',
+    });
+    child.on('error', reject);
+    child.on('exit', (code) => resolve(code ?? 1));
+  });
+}
+
+/** Runs every scenario file under `dir` sequentially; throws if any of them failed. */
+async function runDirectory(dir: string, extraArgs: string[]): Promise<void> {
+  const files = scenarioFilesIn(dir);
+  if (files.length === 0) throw new Error(`no .yaml/.yml scenarios found in ${dir}`);
+
+  const results: { file: string; code: number }[] = [];
+  for (const file of files) {
+    console.log(`\n=== ${file} (${results.length + 1}/${files.length}) ===`);
+    const code = await runInChildProcess(file, extraArgs);
+    results.push({ file, code });
+  }
+
+  console.log('\n=== directory run summary ===');
+  for (const { file, code } of results) console.log(`${code === 0 ? 'ok  ' : 'FAIL'}  ${file}`);
+
+  const failed = results.filter((r) => r.code !== 0);
+  if (failed.length > 0) throw new Error(`${failed.length}/${files.length} scenario(s) failed`);
 }
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: bootstrap
@@ -47,7 +94,19 @@ async function bootstrap(): Promise<void> {
   const scenarioArg = values.scenario ?? positionals[1];
   const scenarioPath = resolveScenarioPath(scenarioArg, protocol);
   if (!scenarioPath) {
-    throw new Error('usage: master <protocol> [scenario] | --scenario <path.yaml> [--nodes N] [--dry-run]');
+    throw new Error('usage: master <protocol> [scenario] | --scenario <path.yaml|dir> [--nodes N] [--dry-run]');
+  }
+
+  // A directory runs every scenario file it contains, one child process each
+  // (see runInChildProcess for why: OTel's global providers can't be
+  // re-registered in-process between runs).
+  if (existsSync(scenarioPath) && statSync(scenarioPath).isDirectory()) {
+    const extraArgs = [
+      ...(nodes !== undefined ? ['--nodes', String(nodes)] : []),
+      ...(values['dry-run'] ? ['--dry-run'] : []),
+    ];
+    await runDirectory(scenarioPath, extraArgs);
+    return;
   }
 
   const env = loadEnv();

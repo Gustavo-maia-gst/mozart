@@ -1,5 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { type Delivery, type GraphId, type Json, type NodeId, type Scenario } from '@mozart/contracts';
+import {
+  type Delivery,
+  type FaultHook,
+  type GraphId,
+  type Json,
+  type NodeId,
+  type Scenario,
+  WORKER_TOPICS,
+} from '@mozart/contracts';
 import type { LatencyModel } from '@mozart/latency';
 import {
   annotateSpan,
@@ -20,6 +28,12 @@ import { CLOCK, LATENCY_MODEL, SCENARIO, SCHEDULER } from '../tokens';
 import { DELIVERY_SINK, type DeliverySink, NetworkState } from './delivery-sink';
 
 const tracer = trace.getTracer(TRACER_NAME);
+/** Returns true if it killed `ctx.node` (the caller must not run the guarded effect). */
+export type FaultTriggerFn = (
+  hook: FaultHook,
+  phase: 'before' | 'after',
+  ctx: { message: unknown; topic?: string; node: NodeId; attempt?: number },
+) => boolean;
 /**
  * The simulated broker renders as its own service (⇒ its own colour/lane in
  * Jaeger/Grafana), distinct from the run's main service. Only the message-
@@ -81,6 +95,8 @@ export class TransportService {
   private rr = 0;
   /** Duplicate copies to attach to the next enqueued message (fault). */
   private duplicateBudget = 0;
+  /** Set by FaultTriggerService; gates deliveries to a coordinator. */
+  public trigger?: FaultTriggerFn;
 
   // biome-ignore lint/complexity/useMaxParams: deps injection
   constructor(
@@ -275,6 +291,15 @@ export class TransportService {
   }
 
   private emitDelivery(msg: Pending, target: NodeId, deliveryId: string, redelivery: boolean): void {
+    // Candidate fault hooks for this delivery: the generic one, plus the sugar
+    // hook for worker-pool events (mutually exclusive by topic).
+    const hooks: FaultHook[] = ['ReceiveMessage'];
+    if (msg.topic === WORKER_TOPICS.completed) hooks.push('WorkerSuccessMessage');
+    else if (msg.topic === WORKER_TOPICS.failed) hooks.push('WorkerFailureMessage');
+    const faultCtx = { message: msg.body, topic: msg.topic, node: target, attempt: msg.attempts };
+
+    if (hooks.some((hook) => this.trigger?.(hook, 'before', faultCtx))) return; // never delivered
+
     // First real delivery: the message is no longer awaiting delivery — close its
     // queue-residency span (guarded by presence, so block→resume/redelivery are safe).
     if (msg.queueSpan) {
@@ -294,6 +319,7 @@ export class TransportService {
     this.metrics.countMessage(redelivery ? 'redelivered' : 'delivered');
     const ok = this.sink.deliver(target, delivery);
     if (ok && !redelivery) this.emitDuplicates(msg);
+    hooks.some((hook) => this.trigger?.(hook, 'after', faultCtx));
   }
 
   private onVisibilityTimeout(messageId: string): void {

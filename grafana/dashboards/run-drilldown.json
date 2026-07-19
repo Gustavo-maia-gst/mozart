@@ -54,9 +54,9 @@
       {
         "name": "service",
         "type": "textbox",
-        "current": { "text": "", "value": "" },
+        "current": { "text": "harness", "value": "harness" },
         "label": "Jaeger service (coordinator)",
-        "description": "Service name used for the traces panel (the coordinator name from the scenario YAML, or 'harness')."
+        "description": "Defaults to 'harness' — the run's root span lives there, so the tag filter below always finds it. Change only to search a different service's spans (e.g. 'transport', or the coordinator name from the scenario YAML); the opened trace is the same whole-run waterfall either way."
       }
     ]
   },
@@ -261,15 +261,15 @@
     },
     {
       "type": "row",
-      "title": "Traces (Jaeger) — the run's timeline lives here",
+      "title": "Concurrency timeline (Jaeger waterfall)",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 }
     },
     {
       "type": "traces",
-      "title": "Recent traces — set the $service variable (coordinator name)",
+      "title": "Run timeline — open the trace below for the concurrency Gantt",
       "datasource": { "type": "jaeger", "uid": "mozart-jaeger" },
       "gridPos": { "h": 12, "w": 24, "x": 0, "y": 25 },
-      "targets": [{ "refId": "A", "queryType": "search", "service": "$service", "limit": 20 }]
+      "targets": [{ "refId": "A", "queryType": "search", "service": "$service", "tags": "mozart.run_id=$run", "limit": 5 }]
     }
   ]
 }

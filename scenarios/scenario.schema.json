@@ -237,146 +237,168 @@
       }
     },
     "faults": {
-      "default": [],
       "type": "array",
       "items": {
-        "oneOf": [
+        "anyOf": [
           {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "killNode"
-              },
-              "at": {
-                "type": "number",
-                "minimum": 0
-              },
-              "node": {
-                "type": "string",
-                "minLength": 1
-              },
-              "restartAfterMs": {
-                "type": "number",
-                "exclusiveMinimum": 0
-              }
-            },
-            "required": [
-              "action",
-              "at",
-              "node"
-            ]
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "storageOutage"
-              },
-              "at": {
-                "type": "number",
-                "minimum": 0
-              },
-              "scope": {
-                "anyOf": [
-                  {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "action": {
                     "type": "string",
-                    "const": "all"
+                    "const": "killNode"
                   },
-                  {
+                  "at": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "node": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "restartAfterMs": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": [
+                  "action",
+                  "at",
+                  "node"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "const": "storageOutage"
+                  },
+                  "at": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "scope": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "all"
+                      },
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    ]
+                  },
+                  "durationMs": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": [
+                  "action",
+                  "at",
+                  "scope",
+                  "durationMs"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "const": "partitionNode"
+                  },
+                  "at": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "node": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "durationMs": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "direction": {
+                    "default": "both",
+                    "type": "string",
+                    "enum": [
+                      "in",
+                      "out",
+                      "both"
+                    ]
+                  }
+                },
+                "required": [
+                  "action",
+                  "at",
+                  "node",
+                  "durationMs"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "const": "duplicateDeliveries"
+                  },
+                  "at": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "extraCopies": {
+                    "default": 1,
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "action",
+                  "at"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "const": "failTask"
+                  },
+                  "taskId": {
                     "type": "string",
                     "minLength": 1
                   }
+                },
+                "required": [
+                  "action",
+                  "taskId"
                 ]
-              },
-              "durationMs": {
-                "type": "number",
-                "exclusiveMinimum": 0
               }
-            },
-            "required": [
-              "action",
-              "at",
-              "scope",
-              "durationMs"
             ]
           },
           {
             "type": "object",
             "properties": {
-              "action": {
-                "type": "string",
-                "const": "partitionNode"
-              },
-              "at": {
-                "type": "number",
-                "minimum": 0
-              },
-              "node": {
-                "type": "string",
-                "minLength": 1
-              },
-              "durationMs": {
+              "restartAfterMs": {
+                "default": 500,
                 "type": "number",
                 "exclusiveMinimum": 0
               },
-              "direction": {
-                "default": "both",
-                "type": "string",
-                "enum": [
-                  "in",
-                  "out",
-                  "both"
-                ]
-              }
-            },
-            "required": [
-              "action",
-              "at",
-              "node",
-              "durationMs"
-            ]
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "duplicateDeliveries"
-              },
-              "at": {
-                "type": "number",
-                "minimum": 0
-              },
-              "extraCopies": {
+              "times": {
                 "default": 1,
                 "type": "integer",
                 "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
               }
             },
-            "required": [
-              "action",
-              "at"
-            ]
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "failTask"
-              },
-              "taskId": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "required": [
-              "action",
-              "taskId"
-            ]
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         ]
       }

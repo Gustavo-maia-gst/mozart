@@ -2,6 +2,7 @@ import type { FaultSpec, NodeId, Scenario, TaskId } from '@mozart/contracts';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Scheduler } from '../clock/clock';
 import { EventLogService } from '../event-log/event-log.service';
+import { FaultTriggerService } from './fault-trigger.service';
 import { ProcessManagerService } from '../ipc-server/process-manager.service';
 import type { FaultAction } from '../metrics/metrics.service';
 import { MetricsService } from '../metrics/metrics.service';
@@ -31,13 +32,14 @@ export class FaultInjectorService {
     private readonly worker: WorkerPoolService,
     private readonly events: EventLogService,
     private readonly metrics: MetricsService,
+    private readonly triggers: FaultTriggerService,
   ) {}
 
   /** Schedule all declared faults relative to now (call once, at run start). */
   public arm(): void {
     for (const fault of this.scenario.faults) {
       if ('at' in fault) this.scheduler.after(fault.at, () => this.apply(fault));
-      else this.apply(fault); // failTask has no schedule — arm immediately
+      else this.apply(fault); // failTask/conditionalKill have no schedule — arm immediately
     }
   }
 
@@ -48,6 +50,7 @@ export class FaultInjectorService {
       partitionNode: (f) => this.partitionNode(f.node, f.durationMs, f.direction),
       duplicateDeliveries: (f) => this.duplicateDeliveries(f.extraCopies),
       failTask: (f) => this.failTask(f.taskId),
+      conditionalKill: (f) => this.triggers.register(f),
     };
     (dispatch[fault.action] as (f: FaultSpec) => void)(fault);
   }

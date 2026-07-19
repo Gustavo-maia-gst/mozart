@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=../scenario.schema.json
+# Chaos demo: dependency-frontier (naive, no completion guard) double-fires
+# graph completion under redelivery.
+#
+# d is the graph's sink: by the time it announces its own completion
+# (`task.finished` over transport.toCoordinators), every task is done and
+# that send is what makes `maybeFinish` call `completeGraph`. We kill the
+# coordinator right after that send goes out but before it acks the push that
+# triggered it — the push is redelivered, `onWorkerSuccess` reruns with no
+# duplicate-completion guard (see dependency_frontier.ts) and re-announces
+# `task.finished` for d a second time, driving a *second* `completeGraph`
+# call. Look for two `graph.completed` events for g0 in the JSONL. Compare
+# with kill-before-save-frontier-monotonic.yaml, which guards this exactly
+# once.
+#
+# g1 is an unrelated, long-running task that keeps the run alive well past
+# g0's crash/restart/redelivery storm — with a single graph, the run would
+# shut down the instant the *first* completeGraph('g0') fires (that's the
+# harness's own end-of-processing signal), racing the shutdown against the
+# very duplicate we're trying to observe.
+name: chaos-frontier-naive-duplicate-finish
+seed: 1
+protocol: dependency-frontier
+nodes: [{ id: n1, name: coordinator }]
+graphs:
+  - id: g0
+    tasks:
+      - { id: a, costMs: 50 }
+      - { id: b, dependsOn: [a], costMs: 50 }
+      - { id: c, dependsOn: [a], costMs: 50 }
+      - { id: d, dependsOn: [b, c], costMs: 50 }
+  - id: g1
+    tasks:
+      - { id: z, costMs: 2500 }
+storage: { adapter: in-memory }
+transport: { ackTimeoutMs: 500 }
+latency:
+  transport.deliver: { distribution: constant, value: 10 }
+  storage.read: { distribution: constant, value: 5 }
+  storage.save: { distribution: constant, value: 5 }
+  storage.find: { distribution: constant, value: 5 }
+faults:
+  - failAfterSendMessage: "message.taskId === 'g0-d'"
+    restartAfterMs: 300
+    times: 1
+endCondition: { type: timeout, ms: 4000 }

@@ -9,7 +9,7 @@
   "tags": ["mozart"],
   "schemaVersion": 39,
   "time": {
-    "from": "now-7d",
+    "from": "now-24h",
     "to": "now"
   },
   "templating": {
@@ -35,12 +35,12 @@
         "refresh": 2,
         "includeAll": true,
         "multi": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
         },
-        "label": "Scenario"
+        "label": "Scenario",
+        "description": "Only scenarios that ever injected a fault show up here (this dashboard is fault-scoped by design) — \"All\" means all of those, not every run ever."
       },
       {
         "name": "protocol",
@@ -56,7 +56,6 @@
         "refresh": 2,
         "includeAll": true,
         "multi": true,
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
@@ -68,35 +67,80 @@
   "panels": [
     {
       "type": "row",
-      "title": "Fault injection",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      }
+      "title": "Safety under fault",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
     },
     {
       "type": "bargauge",
-      "title": "Faults injected by action",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
+      "title": "Safety violations (premature-start)",
+      "description": "The harness's own safety oracle: a task started before all its dependencies finished. This is a correctness bug, not a cost — zero is the only acceptable value, under any fault.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 1 },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "lcd"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 1
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green" }, { "color": "red", "value": 1 }]
+          }
+        }
       },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"premature-start\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))\nor\nsum by (mozart_protocol) (last_over_time(mozart_faults_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]) * 0)",
+          "legendFormat": "{{mozart_protocol}}"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Redundant work under redelivery (duplicate-start, W deduped)",
+      "description": "A task got redispatched while already running — harmless (the worker pool dedupes it), but it's the visible cost of at-least-once redelivery colliding with a protocol's own liveness re-drive. Not a safety issue; higher here means more wasted re-execution per fault.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 1 },
       "options": {
         "orientation": "horizontal",
         "displayMode": "gradient"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "min": 0
         }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_worker_tasks_total{outcome=\"duplicate-start\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))\nor\nsum by (mozart_protocol) (last_over_time(mozart_faults_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]) * 0)",
+          "legendFormat": "{{mozart_protocol}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Faults injected",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 }
+    },
+    {
+      "type": "bargauge",
+      "title": "Faults injected by action and protocol",
+      "description": "What was actually thrown at each protocol — context for the panels below, not a verdict on its own.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
       },
       "targets": [
         {
@@ -108,135 +152,50 @@
       ]
     },
     {
+      "type": "row",
+      "title": "Cost of recovery",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 }
+    },
+    {
       "type": "bargauge",
-      "title": "Node lifecycle events",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 1
-      },
+      "title": "Kills vs restarts by protocol",
+      "description": "Every crash should be followed by a restart under the same node id. killed > restarted means a crash was never recovered (or the run ended first).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
       "options": {
         "orientation": "horizontal",
         "displayMode": "gradient"
       },
       "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        }
+        "defaults": { "unit": "short" }
       },
       "targets": [
         {
           "refId": "A",
           "instant": true,
-          "expr": "sum by (event) (last_over_time(mozart_node_lifecycle_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))",
-          "legendFormat": "{{event}}"
-        }
-      ]
-    },
-    {
-      "type": "row",
-      "title": "Cost of recovery",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 9
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Restarts per killed node",
-      "description": "restarted / killed. ~1 = every crash re-spawns cleanly; <1 = crashes not recovered.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 0,
-        "y": 10
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "orientation": "horizontal"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        }
-      },
-      "targets": [
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_node_lifecycle_total{event=\"killed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))",
+          "legendFormat": "{{mozart_protocol}} / killed"
+        },
         {
-          "refId": "A",
+          "refId": "B",
           "instant": true,
-          "expr": "sum by (mozart_protocol) (last_over_time(mozart_node_lifecycle_total{event=\"restarted\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_node_lifecycle_total{event=\"killed\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))",
-          "legendFormat": "{{mozart_protocol}}"
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_node_lifecycle_total{event=\"restarted\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))",
+          "legendFormat": "{{mozart_protocol}} / restarted"
         }
       ]
     },
     {
-      "type": "stat",
-      "title": "Redeliveries per fault",
-      "description": "redelivered messages / total faults — how much re-work a fault costs the protocol.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 8,
-        "y": 10
-      },
+      "type": "bargauge",
+      "title": "Blocked messages by protocol",
+      "description": "Messages that found no reachable coordinator (e.g. during the crash/restart window) and had to retry.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "orientation": "horizontal"
+        "orientation": "horizontal",
+        "displayMode": "gradient"
       },
       "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "instant": true,
-          "expr": "sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"redelivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_faults_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))",
-          "legendFormat": "{{mozart_protocol}}"
-        }
-      ]
-    },
-    {
-      "type": "stat",
-      "title": "Blocked messages",
-      "description": "Messages blocked (e.g. during storage outage / partition).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 16,
-        "y": 10
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "orientation": "horizontal"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        }
+        "defaults": { "unit": "short" }
       },
       "targets": [
         {
@@ -248,65 +207,64 @@
       ]
     },
     {
-      "type": "row",
-      "title": "System under fault (over time)",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 16
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Fault injection rate (/s)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 17
+      "type": "bargauge",
+      "title": "Redeliveries by protocol",
+      "description": "Raw at-least-once retries under fault — the mechanical cost, before normalizing by how many faults caused them.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient"
       },
       "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 60
-          }
-        }
+        "defaults": { "unit": "short" }
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (action) (rate(mozart_faults_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__rate_interval]))",
-          "legendFormat": "{{action}}"
+          "instant": true,
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"redelivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))",
+          "legendFormat": "{{mozart_protocol}}"
         }
       ]
     },
     {
+      "type": "bargauge",
+      "title": "Redeliveries per fault (ratio)",
+      "description": "redelivered messages / faults injected — how much re-work a single fault costs each protocol, normalized so protocols under different fault loads are still comparable.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (mozart_protocol) (last_over_time(mozart_messages_total{type=\"redelivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range])) / sum by (mozart_protocol) (last_over_time(mozart_faults_total{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))",
+          "legendFormat": "{{mozart_protocol}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "System dynamics during faults",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 }
+    },
+    {
       "type": "timeseries",
       "title": "In-flight messages & leases held",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 17
-      },
+      "description": "Backlog/contention building up while a coordinator is down and draining once it's back — the shape of the crash, not just its final tally.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 34 },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 15
-          }
+          "custom": { "drawStyle": "line", "fillOpacity": 15 }
         }
       },
       "targets": [
@@ -319,36 +277,6 @@
           "refId": "B",
           "expr": "sum(last_over_time(mozart_storage_leases_held{mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__range]))",
           "legendFormat": "leases held"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Redelivery rate (/s)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 25
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 20
-          }
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (mozart_protocol) (rate(mozart_messages_total{type=\"redelivered\", mozart_scenario=~\"$scenario\", mozart_protocol=~\"$protocol\"}[$__rate_interval]))",
-          "legendFormat": "{{mozart_protocol}}"
         }
       ]
     }
