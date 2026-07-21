@@ -54,12 +54,29 @@ export class ProtocolHostService {
   ) {}
 
   public async start(): Promise<void> {
-    // Register the push handler first; anything arriving before the handshake
-    // completes is buffered and drained once we're ready.
+    // Register the push handler first; anything arriving before we're ready is
+    // buffered and drained below.
     this.ipc.onPush((type, payload, frame) => this.onPush(type, payload, frame.traceCtx));
+    // Recover BEFORE the handshake: on a stateless restart this rebuilds and
+    // re-drives the frontier from S (the master won't re-send graph.start), so
+    // even tasks that were ready-but-never-dispatched before the crash get
+    // revived. On a fresh start nothing is persisted yet — a no-op — and the
+    // graph.start that follows drives the run. Running it before node.ready keeps
+    // the master's persist strictly after every slave's recovery (awaitAllReady
+    // only resolves once node.ready lands), so a fresh start never races persist.
+    await this.runStartup();
     await this.ipc.call('node.ready', {});
     this.ready = true;
     for (const p of this.buffer.splice(0)) this.onPush(p.type, p.payload, p.traceCtx);
+  }
+
+  private async runStartup(): Promise<void> {
+    await runInTraceScope({ nodeId: this.nodeId }, () => this.startup());
+  }
+
+  @Trace({ name: 'protocol.onStartup', kind: SpanKind.CONSUMER })
+  private async startup(): Promise<void> {
+    await this.protocol.onStartup();
   }
 
   private onPush(type: PushType, payload: unknown, traceCtx: Record<string, string>): void {

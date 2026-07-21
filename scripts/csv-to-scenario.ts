@@ -2,21 +2,23 @@
 /**
  * csv-to-scenario — turn one or more task CSVs into a Mozart scenario YAML.
  *
- * Each CSV is one DAG. The CSV carries no edges, only a topological `order`
- * column, so we synthesize a valid DAG: a task at order N depends on a random
- * subset of the tasks at strictly-lower orders (fan-in of a few units up to
- * dozens, clamped to what's available). Lower→higher edges are always acyclic,
- * so the result is guaranteed to be a DAG. Order-0 tasks are the roots.
+ * Each CSV is one DAG. Its edges come from a required `<file>.deps.json` sidecar
+ * sitting next to it (the real production topology, preserved). Sidecar shape:
  *
- * Output is non-deterministic by default (the seed is the wall clock). Pass
- * `--seed` to reproduce a run: the same inputs + seed produce the same YAML,
- * and that seed also lands in the scenario's `seed:` field.
+ *   { "edges": [[source, target], ...], "taskIds": [id, ...] }
  *
- * CSV shape (header required, columns may be in any order):
+ * where `[source, target]` means "target depends on source", and `taskIds` is
+ * every node (roots/leaves included). The CSV supplies per-task `cost_ms`; its
+ * ids must match the sidecar's. A CSV with no sidecar is an error.
  *
- *   nodeId,order,cost_ms
- *   a,0,50
- *   b,1,30
+ * `--seed` sets the scenario's `seed:` field (reproducible latency sampling at
+ * run time); it does not affect the edges, which are taken verbatim.
+ *
+ * CSV shape (header required, columns may be in any order). The id column may be
+ * `taskId` or `nodeId`; `cost_ms` is optional:
+ *
+ *   taskId,cost_ms
+ *   172313656,440.6
  *   ...
  *
  * Prefer `--out` over a shell redirect: it writes the file directly (so pnpm's
@@ -26,30 +28,33 @@
  *
  * Usage:
  *   tsx scripts/csv-to-scenario.ts graph-a.csv graph-b.csv --out scenarios/x.yaml
- *   pnpm scenario:from-csv g1.csv g2.csv --name big-run --min-fanin 4 --max-fanin 40
+ *   pnpm scenario:from-csv g1.csv g2.csv --name big-run --seed 1
  *
  * Flags (all optional):
  *   --out <path>      write here instead of stdout (also fixes the modeline path)
  *   --name <s>        scenario name           (default: derived from files)
  *   --protocol <s>    protocol id             (default: baseline)
- *   --seed <s|n>      seed for edges + YAML seed:  (default: current time)
- *   --min-fanin <n>   min deps per non-root    (default: 1)
- *   --max-fanin <n>   max deps per non-root    (default: 30)
+ *   --seed <s|n>      scenario seed:          (default: current time)
  *   --timeout <n>     endCondition timeout ms  (default: 60000)
  *   --schema <path>   explicit $schema modeline path (overrides the derived one)
  */
 
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, relative } from 'node:path';
-import { readFileSync, writeFileSync } from 'node:fs';
 
 interface Task {
   id: string;
-  order: number;
   costMs?: number;
 }
 interface GraphSpec {
   id: string;
   tasks: { id: string; dependsOn: string[]; costMs?: number }[];
+}
+
+/** Sidecar with real edges: `[source, target]` = "target depends on source". */
+interface DepsFile {
+  edges: [number | string, number | string][];
+  taskIds: (number | string)[];
 }
 
 /** JSON Schema for scenario YAMLs, emitted by `pnpm run schema:gen`. */
@@ -59,10 +64,8 @@ interface Options {
   files: string[];
   name?: string;
   protocol: string;
-  /** Drives both the YAML `seed:` and edge synthesis; defaults to the wall clock. */
+  /** The scenario's `seed:` (reproducible latency sampling); not used for edges. */
   seed: string;
-  minFanIn: number;
-  maxFanIn: number;
   timeoutMs: number;
   /** Destination file; when set the script writes here (vs stdout). */
   out?: string;
@@ -75,8 +78,6 @@ const FLAGS: Record<string, (o: Options, v: string) => void> = {
   '--name': (o, v) => (o.name = v),
   '--protocol': (o, v) => (o.protocol = v),
   '--seed': (o, v) => (o.seed = v),
-  '--min-fanin': (o, v) => (o.minFanIn = Number(v)),
-  '--max-fanin': (o, v) => (o.maxFanIn = Number(v)),
   '--timeout': (o, v) => (o.timeoutMs = Number(v)),
   '--out': (o, v) => (o.out = v),
   '--schema': (o, v) => (o.schema = v),
@@ -87,9 +88,7 @@ function parseArgs(argv: string[]): Options {
   const opts: Options = {
     files,
     protocol: 'baseline',
-    seed: String(Date.now()), // non-deterministic by default; pass --seed for reproducible output
-    minFanIn: 1,
-    maxFanIn: 30,
+    seed: String(Date.now()), // pass --seed for reproducible latency sampling
     timeoutMs: 60_000,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -105,42 +104,7 @@ function parseArgs(argv: string[]): Options {
     }
   }
   if (files.length === 0) throw new Error('at least one CSV file is required');
-  if (opts.minFanIn < 1) throw new Error('--min-fanin must be >= 1');
-  if (opts.maxFanIn < opts.minFanIn) throw new Error('--max-fanin must be >= --min-fanin');
   return opts;
-}
-
-/** Hash an arbitrary seed string to a uint32 for the PRNG (FNV-1a). */
-function hashSeed(s: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
-}
-
-/** Deterministic PRNG (mulberry32) — reproducible edge synthesis. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-const randInt = (rng: () => number, lo: number, hi: number): number => lo + Math.floor(rng() * (hi - lo + 1));
-
-/** Fisher–Yates shuffle in place using the seeded rng. */
-function shuffle<T>(arr: T[], rng: () => number): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
 }
 
 /** Split a CSV line, trimming whitespace and stripping surrounding quotes. */
@@ -158,34 +122,30 @@ function parseCsv(path: string): Task[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
   if (lines.length < 2) throw new Error(`${path}: expected a header and at least one row`);
   const header = splitCsvLine(lines[0]);
-  const col = (name: string): number => {
-    const idx = header.indexOf(name);
-    if (idx === -1) throw new Error(`${path}: missing required column "${name}" (header: ${header.join(',')})`);
-    return idx;
-  };
-  const cols = { id: col('nodeId'), order: col('order'), cost: header.indexOf('cost_ms') /* optional */ };
+  // Id column is `taskId` or `nodeId`; cost_ms is optional.
+  const idCol = header.indexOf('taskId') !== -1 ? header.indexOf('taskId') : header.indexOf('nodeId');
+  if (idCol === -1) throw new Error(`${path}: missing id column "taskId"/"nodeId" (header: ${header.join(',')})`);
+  const cols = { id: idCol, cost: header.indexOf('cost_ms') };
 
   const tasks: Task[] = [];
   const seen = new Set<string>();
   for (let r = 1; r < lines.length; r++) {
     const task = parseRow(splitCsvLine(lines[r]), cols, path, r + 1);
-    if (seen.has(task.id)) throw new Error(`${path}: duplicate nodeId "${task.id}"`);
+    if (seen.has(task.id)) throw new Error(`${path}: duplicate task id "${task.id}"`);
     seen.add(task.id);
     tasks.push(task);
   }
   return tasks;
 }
 
-function parseRow(cells: string[], cols: { id: number; order: number; cost: number }, path: string, row: number): Task {
+function parseRow(cells: string[], cols: { id: number; cost: number }, path: string, row: number): Task {
   const id = cells[cols.id];
-  if (!id) throw new Error(`${path}: row ${row} has an empty nodeId`);
-  const order = Number(cells[cols.order]);
-  if (!Number.isFinite(order)) throw new Error(`${path}: row ${row} has a non-numeric order "${cells[cols.order]}"`);
+  if (!id) throw new Error(`${path}: row ${row} has an empty task id`);
   const rawCost = cols.cost === -1 ? '' : (cells[cols.cost] ?? '');
   const costMs = rawCost === '' ? undefined : Number(rawCost);
   if (costMs !== undefined && (!Number.isFinite(costMs) || costMs <= 0))
     throw new Error(`${path}: row ${row} has an invalid cost_ms "${rawCost}"`);
-  return { id, order, costMs };
+  return { id, costMs };
 }
 
 /** Sanitize a file path into a graph id usable as a YAML/task-id prefix. */
@@ -198,51 +158,90 @@ function graphIdFor(path: string, taken: Set<string>): string {
   return id;
 }
 
+/** Path of the real-edges sidecar for a CSV: `foo.csv` → `foo.deps.json`. */
+function depsPathFor(csvPath: string): string {
+  const ext = extname(csvPath);
+  return `${csvPath.slice(0, csvPath.length - ext.length)}.deps.json`;
+}
+
 /**
- * Synthesize a DAG from ordered tasks: each non-root task depends on a random
- * subset (size in [minFanIn, maxFanIn], clamped to pool) of the tasks at
- * strictly-lower orders.
+ * Build a DAG from the real edges in the `.deps.json` sidecar. `edges` are
+ * `[source, target]` = "target depends on source"; the CSV supplies costs. Ids
+ * must match between the two files. Validates the node sets agree and that the
+ * result is acyclic.
  */
-function synthesize(id: string, tasks: Task[], opts: Options, rng: () => number): GraphSpec {
-  const sorted = [...tasks].sort((a, b) => a.order - b.order);
-  const earlier: string[] = []; // ids of all tasks at a strictly-lower order than the current one
-  let pendingOrder: number | null = null;
-  let pendingBuffer: string[] = []; // tasks at the current order, held back until the order advances
+function depsFromJson(id: string, tasks: Task[], depsPath: string): GraphSpec {
+  const parsed = JSON.parse(readFileSync(depsPath, 'utf8')) as DepsFile;
+  if (!Array.isArray(parsed.edges) || !Array.isArray(parsed.taskIds))
+    throw new Error(`${depsPath}: expected { edges: [[source,target],...], taskIds: [...] }`);
 
-  const out: GraphSpec['tasks'] = [];
-  const flushPending = (): void => {
-    earlier.push(...pendingBuffer);
-    pendingBuffer = [];
-  };
+  const csvIds = new Set(tasks.map((t) => t.id));
+  const jsonIds = new Set(parsed.taskIds.map(String));
+  // The two files must describe the same node set — a mismatch means the CSV and
+  // the sidecar were produced from different extractions (ids out of sync).
+  const onlyCsv = [...csvIds].filter((x) => !jsonIds.has(x));
+  const onlyJson = [...jsonIds].filter((x) => !csvIds.has(x));
+  if (onlyCsv.length > 0 || onlyJson.length > 0)
+    throw new Error(
+      `${depsPath}: task ids do not match the CSV — ` +
+        `${onlyCsv.length} only in CSV (e.g. ${onlyCsv.slice(0, 3).join(', ') || '—'}), ` +
+        `${onlyJson.length} only in json (e.g. ${onlyJson.slice(0, 3).join(', ') || '—'})`,
+    );
 
-  for (const task of sorted) {
-    if (pendingOrder === null) pendingOrder = task.order;
-    if (task.order !== pendingOrder) {
-      flushPending(); // same-order tasks never depend on each other
-      pendingOrder = task.order;
-    }
-    let dependsOn: string[] = [];
-    if (earlier.length > 0) {
-      const want = randInt(rng, opts.minFanIn, opts.maxFanIn);
-      const k = Math.min(want, earlier.length);
-      dependsOn = shuffle([...earlier], rng)
-        .slice(0, k)
-        .sort();
-    }
-    out.push({ id: task.id, dependsOn, ...(task.costMs !== undefined ? { costMs: task.costMs } : {}) });
-    pendingBuffer.push(task.id);
+  const depsOf = new Map<string, string[]>(tasks.map((t) => [t.id, []]));
+  for (const [source, target] of parsed.edges) {
+    const s = String(source);
+    const t = String(target);
+    if (!csvIds.has(s) || !csvIds.has(t))
+      throw new Error(`${depsPath}: edge [${s}, ${t}] references an unknown task id`);
+    (depsOf.get(t) as string[]).push(s);
   }
+
+  const out: GraphSpec['tasks'] = tasks.map((task) => ({
+    id: task.id,
+    dependsOn: [...new Set(depsOf.get(task.id))].sort(),
+    ...(task.costMs !== undefined ? { costMs: task.costMs } : {}),
+  }));
+  assertAcyclic(out, depsPath);
   return { id, tasks: out };
+}
+
+/** Kahn's algorithm: throws with a sample of the offending ids if a cycle exists. */
+function assertAcyclic(tasks: GraphSpec['tasks'], source: string): void {
+  const indegree = new Map<string, number>(tasks.map((t) => [t.id, t.dependsOn.length]));
+  const queue = tasks.filter((t) => t.dependsOn.length === 0).map((t) => t.id);
+  const dependents = new Map<string, string[]>(tasks.map((t) => [t.id, []]));
+  for (const t of tasks) for (const dep of t.dependsOn) dependents.get(dep)?.push(t.id);
+
+  let settled = 0;
+  for (let i = 0; i < queue.length; i++) {
+    settled++;
+    for (const dependent of dependents.get(queue[i]) ?? []) {
+      const left = (indegree.get(dependent) ?? 0) - 1;
+      indegree.set(dependent, left);
+      if (left === 0) queue.push(dependent);
+    }
+  }
+  if (settled !== tasks.length) {
+    const stuck = tasks.filter((t) => (indegree.get(t.id) ?? 0) > 0).map((t) => t.id);
+    throw new Error(
+      `${source}: edges contain a cycle (${tasks.length - settled} tasks, e.g. ${stuck.slice(0, 3).join(', ')})`,
+    );
+  }
 }
 
 // --- YAML emission (hand-rolled — the values are simple ids/numbers/arrays) ---
 
-const inlineDeps = (deps: string[]): string => `[${deps.join(', ')}]`;
+// Task ids are always quoted: purely-numeric ids (e.g. "172313656") would
+// otherwise be parsed back as YAML numbers and fail the scenario schema (ids
+// must be strings); quoting also guards ids that look like true/null/etc.
+const q = (id: string): string => `"${id.replace(/"/g, '\\"')}"`;
+const inlineDeps = (deps: string[]): string => `[${deps.map(q).join(', ')}]`;
 
 function emitGraph(g: GraphSpec): string {
-  const lines = [`  - id: ${g.id}`, `    tasks:`];
+  const lines = [`  - id: ${q(g.id)}`, `    tasks:`];
   for (const t of g.tasks) {
-    const parts = [`id: ${t.id}`];
+    const parts = [`id: ${q(t.id)}`];
     if (t.dependsOn.length > 0) parts.push(`dependsOn: ${inlineDeps(t.dependsOn)}`);
     if (t.costMs !== undefined) parts.push(`costMs: ${t.costMs}`);
     lines.push(`      - { ${parts.join(', ')} }`);
@@ -267,16 +266,18 @@ function emitScenario(graphs: GraphSpec[], opts: Options): string {
   return [
     ...(modeline ? [modeline] : []),
     `# Generated by scripts/csv-to-scenario.ts from ${opts.files.length} CSV(s): ${opts.files.join(', ')}`,
-    `# ${graphs.length} graph(s), ${totalTasks} task(s). Edges synthesized (seed ${opts.seed}, ` +
-      `fan-in ${opts.minFanIn}..${opts.maxFanIn}). Pass --seed to reproduce.`,
+    `# ${graphs.length} graph(s), ${totalTasks} task(s). Edges: real, from .deps.json sidecar(s).`,
     `name: ${opts.name ?? graphs.map((g) => g.id).join('+')}`,
     `seed: ${opts.seed}`,
     `protocol: ${opts.protocol}`,
     `nodes: [{ id: n1, name: coordinator }]`,
-    `storage: { adapter: in-memory }`,
+    `storage: { adapter: postgres }`,
     `transport: { ackTimeoutMs: 2000 }`,
     `latency:`,
-    `  transport.deliver: { distribution: normal, mean: 15, stddev: 5 }`,
+    // Communication latency: right-skewed (longer upper tail than lower), the
+    // shape real network/queue latency has. Lognormal with mu/sigma in log-space
+    // chosen for mean ≈ 50ms, stddev ≈ 20ms (median ≈ 46ms).
+    `  transport.deliver: { distribution: lognormal, mu: 3.84, sigma: 0.385 }`,
     `  storage.read: { distribution: constant, value: 5 }`,
     `  storage.save: { distribution: constant, value: 5 }`,
     `endCondition: { type: timeout, ms: ${opts.timeoutMs} }`,
@@ -291,11 +292,11 @@ function emitScenario(graphs: GraphSpec[], opts: Options): string {
 
 function main(): void {
   const opts = parseArgs(process.argv.slice(2));
-  const rng = mulberry32(hashSeed(opts.seed));
   const takenIds = new Set<string>();
   const graphs = opts.files.map((file) => {
-    const id = graphIdFor(file, takenIds);
-    return synthesize(id, parseCsv(file), opts, rng);
+    const depsPath = depsPathFor(file);
+    if (!existsSync(depsPath)) throw new Error(`${file}: missing required edges sidecar ${depsPath}`);
+    return depsFromJson(graphIdFor(file, takenIds), parseCsv(file), depsPath);
   });
   const yaml = emitScenario(graphs, opts);
   if (opts.out) {

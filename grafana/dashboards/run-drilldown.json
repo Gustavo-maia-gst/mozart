@@ -269,7 +269,9 @@
       "title": "Run timeline — open the trace below for the concurrency Gantt",
       "datasource": { "type": "jaeger", "uid": "mozart-jaeger" },
       "gridPos": { "h": 12, "w": 24, "x": 0, "y": 25 },
-      "targets": [{ "refId": "A", "queryType": "search", "service": "$service", "tags": "mozart.run_id=$run", "limit": 5 }]
+      "targets": [
+        { "refId": "A", "queryType": "search", "service": "$service", "tags": "mozart.run_id=$run", "limit": 5 }
+      ]
     }
   ]
 }

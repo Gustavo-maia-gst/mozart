@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 1,
+  "id": 2,
   "links": [],
   "panels": [
     {
@@ -168,7 +168,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 7,
+        "w": 17,
         "x": 7,
         "y": 1
       },
@@ -266,8 +266,8 @@
       "gridPos": {
         "h": 8,
         "w": 5,
-        "x": 14,
-        "y": 1
+        "x": 0,
+        "y": 9
       },
       "id": 4,
       "options": {
@@ -335,8 +335,8 @@
       "gridPos": {
         "h": 8,
         "w": 5,
-        "x": 19,
-        "y": 1
+        "x": 5,
+        "y": 9
       },
       "id": 5,
       "options": {
@@ -372,19 +372,6 @@
       ],
       "title": "Storage ops per completed task",
       "type": "bargauge"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 9
-      },
-      "id": 10,
-      "panels": [],
-      "title": "Comparison — protocols × node count",
-      "type": "row"
     },
     {
       "datasource": {
@@ -454,10 +441,10 @@
         ]
       },
       "gridPos": {
-        "h": 9,
-        "w": 24,
-        "x": 0,
-        "y": 10
+        "h": 8,
+        "w": 14,
+        "x": 10,
+        "y": 9
       },
       "id": 11,
       "options": {
@@ -555,7 +542,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 17
       },
       "id": 12,
       "panels": [],
@@ -643,7 +630,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 20
+        "y": 18
       },
       "id": 14,
       "options": {
@@ -788,7 +775,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 20
+        "y": 18
       },
       "id": 16,
       "options": {
@@ -858,7 +845,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 29
+        "y": 27
       },
       "id": 17,
       "panels": [],
@@ -942,7 +929,7 @@
         "h": 9,
         "w": 8,
         "x": 0,
-        "y": 30
+        "y": 28
       },
       "id": 18,
       "options": {
@@ -1106,7 +1093,7 @@
         "h": 9,
         "w": 8,
         "x": 8,
-        "y": 30
+        "y": 28
       },
       "id": 19,
       "options": {
@@ -1270,7 +1257,7 @@
         "h": 9,
         "w": 8,
         "x": 16,
-        "y": 30
+        "y": 28
       },
       "id": 20,
       "options": {
@@ -1434,7 +1421,7 @@
         "h": 9,
         "w": 8,
         "x": 0,
-        "y": 39
+        "y": 37
       },
       "id": 22,
       "options": {
@@ -1598,7 +1585,7 @@
         "h": 9,
         "w": 8,
         "x": 8,
-        "y": 39
+        "y": 37
       },
       "id": 23,
       "options": {
@@ -1762,7 +1749,7 @@
         "h": 9,
         "w": 8,
         "x": 16,
-        "y": 39
+        "y": 37
       },
       "id": 24,
       "options": {
@@ -1870,8 +1857,8 @@
       {
         "allValue": ".*",
         "current": {
-          "text": "All",
-          "value": "$__all"
+          "text": ["inputs_mensais"],
+          "value": ["inputs_mensais"]
         },
         "datasource": {
           "type": "prometheus",
@@ -1988,5 +1975,5 @@
   "timezone": "",
   "title": "Mozart — Protocol comparison",
   "uid": "mozart-protocol-comparison",
-  "version": 14
+  "version": 2
 }

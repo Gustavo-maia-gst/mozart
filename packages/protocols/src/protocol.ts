@@ -21,6 +21,7 @@ import { Injectable } from '@nestjs/common';
  *
  * Setup:
  *  - `persistGraph` — how a graph is stored in S before it runs (setup only);
+ *  - `onStartup`    — recover/re-drive from S right after (re)instantiation;
  *  - `startGraph`   — begin executing an already-persisted graph.
  *
  * Inbound events — the host routes each delivery by topic to exactly one of:
@@ -40,6 +41,19 @@ export abstract class Protocol {
   ) {}
 
   abstract readonly name: string;
+
+  /**
+   * Called once, right after the protocol is (re)instantiated and before any
+   * `graph.start` or delivery is processed — on a fresh start AND on a stateless
+   * restart after a crash. The master only ever sends `graph.start` once, so a
+   * restarted coordinator would otherwise never revive a graph whose tasks were
+   * ready but not yet dispatched when it crashed. Stateless protocols override
+   * this to rebuild and re-drive their frontier from S; the default is a no-op
+   * (on a fresh start nothing is persisted yet, so overrides no-op then too).
+   */
+  public onStartup(): Promise<void> {
+    return Promise.resolve();
+  }
 
   public abstract startGraph(graphId: GraphId): Promise<void>;
 

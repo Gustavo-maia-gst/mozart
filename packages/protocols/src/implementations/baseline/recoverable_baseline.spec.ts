@@ -128,7 +128,7 @@ describe('RecoverableBaselineProtocol', () => {
     expect(started).toEqual(['a', 'b', 'c']);
   });
 
-  it('recovers in-flight state after a restart and finishes the graph', async () => {
+  it('recovers in-flight state on startup after a restart and finishes the graph', async () => {
     const p1 = await makeProtocol();
     await p1.persistGraph(graph);
     await p1.startGraph('g0'); // dispatch a
@@ -137,17 +137,37 @@ describe('RecoverableBaselineProtocol', () => {
     // Crash + stateless restart: a brand-new instance, only the durable log survives.
     started.length = 0;
     const p2 = await makeProtocol();
-    await p2.onWorkerSuccess(success('b')); // first touch → rebuild frontier from the log
+    await p2.onStartup(); // recover proactively: rebuild frontier from the log, re-drive
 
     // Recovery replays a=complete, then re-dispatches the ready frontier {b, c}.
     expect(started).toEqual(['b', 'c']);
+    await p2.onWorkerSuccess(success('b'));
     await p2.onWorkerSuccess(success('c')); // b + c done → d ready
     expect(started).toEqual(['b', 'c', 'd']);
     await p2.onWorkerSuccess(success('d'));
     expect(completedGraph).toBe('g0');
   });
 
-  it('signals completion on restart if every task was already logged complete', async () => {
+  it('re-dispatches a ready task that was never started before the crash', async () => {
+    // The bug onStartup fixes: a task logged `running` but never actually run
+    // (crashed between the WAL write and the dispatch, so no completion will ever
+    // come back to lazily trigger recovery). Only proactive startup recovery can
+    // revive it.
+    const p1 = await makeProtocol();
+    await p1.persistGraph(graph);
+    await p1.startGraph('g0'); // logs a=running and dispatches it
+    expect(store.get('a')).toMatchObject({ status: 'running' });
+
+    // Restart: fresh instance, no completion for `a` incoming.
+    started.length = 0;
+    const p2 = await makeProtocol();
+    await p2.onStartup();
+
+    // `a` is ready-but-not-complete, so onStartup re-dispatches it unprompted.
+    expect(started).toEqual(['a']);
+  });
+
+  it('signals completion on startup if every task was already logged complete', async () => {
     const p1 = await makeProtocol();
     await p1.persistGraph(graph);
     await p1.startGraph('g0');
@@ -155,8 +175,21 @@ describe('RecoverableBaselineProtocol', () => {
     completedGraph = undefined; // pretend the pre-crash completeGraph never reached the master
 
     const p2 = await makeProtocol();
-    await p2.startGraph('g0'); // reload → all complete → re-signal
+    await p2.onStartup(); // reload → all complete → re-signal
     expect(completedGraph).toBe('g0');
+  });
+
+  it('a completion for a graph not yet loaded is a no-op (loads happen at startup)', async () => {
+    const p1 = await makeProtocol();
+    await p1.persistGraph(graph);
+    await p1.startGraph('g0');
+
+    // Fresh instance that skipped onStartup: a stray completion must not throw or
+    // advance anything, since the frontier isn't loaded.
+    started.length = 0;
+    const p2 = await makeProtocol();
+    await p2.onWorkerSuccess(success('a'));
+    expect(started).toEqual([]);
   });
 
   it('retries a failed task by re-dispatching it', async () => {

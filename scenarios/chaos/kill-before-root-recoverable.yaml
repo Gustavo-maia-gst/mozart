@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=../scenario.schema.json
+# Chaos demo: the "never-started task" recovery bug and its onStartup fix.
+#
+# The coordinator is killed right BEFORE it dispatches the root task `a` to the
+# worker pool (failBeforeSendToWorker) — so `a` is logged `running` in the WAL
+# but never actually reaches W, and no completion will ever come back for it.
+#
+# `graph.start` was delivered but never acked (the crash hit mid-dispatch), so
+# the transport WILL eventually redeliver it and re-trigger recovery — but only
+# after a full `ackTimeoutMs` visibility timeout. Here that timeout (6000ms) is
+# deliberately longer than the run's end condition (3000ms): relying on
+# redelivery, the graph would stall past the end of the run with `a` never
+# started. With baseline-recoverable's `onStartup` recovery, the restarted
+# coordinator rebuilds the frontier from S the moment it comes back (~300ms),
+# re-dispatches `a`, and the run completes well within the window — recovery no
+# longer depends on the transport's redelivery timer.
+name: chaos-kill-before-root-recoverable
+seed: 1
+protocol: baseline-recoverable
+nodes: [{ id: n1, name: coordinator }]
+graphs:
+  - id: g0
+    tasks:
+      - { id: a, costMs: 50 }
+      - { id: b, dependsOn: [a], costMs: 50 }
+      - { id: c, dependsOn: [a], costMs: 50 }
+      - { id: d, dependsOn: [b, c], costMs: 50 }
+storage: { adapter: in-memory }
+transport: { ackTimeoutMs: 6000 }
+latency:
+  transport.deliver: { distribution: constant, value: 10 }
+  storage.read: { distribution: constant, value: 5 }
+  storage.save: { distribution: constant, value: 5 }
+  storage.find: { distribution: constant, value: 5 }
+faults:
+  - failBeforeSendToWorker: "message.taskId === 'g0-a'"
+    restartAfterMs: 300
+    times: 1
+endCondition: { type: timeout, ms: 4000 }

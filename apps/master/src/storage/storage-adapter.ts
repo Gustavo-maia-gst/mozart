@@ -64,5 +64,7 @@ export interface StorageAdapter {
    */
   acquire(taskId: TaskId, signal: AbortSignal): Promise<AdapterLease>;
   init?(): Promise<void>;
+  /** Wipe all persisted state (used to clear shared storage at end of run). */
+  clear?(): Promise<void>;
   dispose?(): Promise<void>;
 }

@@ -7,6 +7,13 @@ export class InMemoryStorageAdapter implements StorageAdapter {
   private readonly store = new Map<TaskId, TaskState>();
   private readonly mutexes = new Map<TaskId, Mutex>();
 
+  /** Wipe all state (end-of-run cleanup; mostly a no-op since the process is ending). */
+  public clear(): Promise<void> {
+    this.store.clear();
+    this.mutexes.clear();
+    return Promise.resolve();
+  }
+
   public read(taskId: TaskId): Promise<TaskState | null> {
     return Promise.resolve(this.clone(this.store.get(taskId)));
   }

@@ -177,6 +177,11 @@ export class StorageService {
     return this.leases.size;
   }
 
+  /** Wipe all persisted state — used to clear shared storage at end of run. */
+  public async clear(): Promise<void> {
+    await this.adapter.clear?.();
+  }
+
   private addPending(nodeId: NodeId, controller: AbortController): void {
     let set = this.pendingByNode.get(nodeId);
     if (!set) {

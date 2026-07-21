@@ -53,19 +53,23 @@ interface TaskLog extends JsonObject {
  * redo log in S, like a relational DB's write-ahead log: `running` is logged
  * before a task is dispatched, `complete` before its dependents are advanced.
  *
- * The in-memory frontier is disposable. On any handler, the leader lazily
- * *loads* the graph it touches: if its runtime isn't in memory (fresh start, or
- * a stateless restart after SIGKILL), it rebuilds the frontier by replaying the
- * log from S and re-dispatches every ready task. Re-dispatch is safe —
- * at-least-once by design: W dedupes a still-running task, and a duplicate
- * completion is a no-op. So a crashed leader simply restarts and resumes where
- * the log left off, instead of losing the run like the plain baseline.
+ * The in-memory frontier is disposable and rebuilt from S. Recovery is driven
+ * by {@link onStartup}, which the host calls on every (re)instantiation: a fresh
+ * start finds nothing persisted yet and no-ops (the `graph.start` that follows
+ * drives the run), while a stateless restart after SIGKILL rebuilds every
+ * persisted graph's frontier from the log and re-dispatches every ready task —
+ * including ones that were ready but never dispatched before the crash, which
+ * the master's one-shot `graph.start` would otherwise never revive. Re-dispatch
+ * is safe — at-least-once by design: W dedupes a still-running task and a
+ * duplicate completion is a no-op. So a crashed leader simply restarts and
+ * resumes where the log left off, instead of losing the run like the plain
+ * baseline.
  */
 @Injectable()
 export class RecoverableBaselineProtocol extends Protocol {
   readonly name = 'baseline-recoverable';
 
-  /** The "already loaded?" flag: presence here means the frontier is in memory. */
+  /** In-memory frontier per graph, populated by {@link onStartup}/{@link startGraph}. */
   private readonly runtimes = new Map<GraphId, GraphRuntime>();
 
   /** Persist the graph blob (setup only, on the master). */
@@ -76,17 +80,30 @@ export class RecoverableBaselineProtocol extends Protocol {
     this.log.info('graph persisted', { graphId: id, tasks: graph.order });
   }
 
-  /** Begin (or, after a restart, resume) a graph — both go through the same load path. */
-  public async startGraph(graphId: GraphId): Promise<void> {
-    this.log.info('graph started', { graphId });
-    await this.ensureLoaded(graphId);
+  /**
+   * Recover on (re)start. A fresh start finds nothing persisted (the master
+   * writes the graph blobs later, then sends `graph.start`), so this no-ops. A
+   * stateless restart finds every persisted graph and rebuilds + re-drives each
+   * frontier from the log — the sole recovery path, since `graph.start` is never
+   * re-sent.
+   */
+  public override async onStartup(): Promise<void> {
+    const graphs = await this.storage.find({ kind: GRAPH_KIND });
+    for (const { data } of graphs) await this.load((data as GraphRecord).graphId);
   }
 
-  /** Advance the DAG on a completion, loading (recovering) the graph first if needed. */
+  /** Begin a freshly-activated graph (first run). */
+  public async startGraph(graphId: GraphId): Promise<void> {
+    this.log.info('graph started', { graphId });
+    await this.load(graphId);
+  }
+
+  /** Advance the DAG on a completion against the in-memory frontier (loaded at startup). */
   public async onWorkerSuccess(event: WorkerSuccessEvent): Promise<void> {
     const log = (await this.storage.read(event.taskId)) as TaskLog | null;
     if (!log) return; // never dispatched (no WAL entry) → unknown, no-op
-    const runtime = await this.ensureLoaded(log.graphId);
+    const runtime = this.runtimes.get(log.graphId);
+    if (!runtime) return; // graph not loaded (onStartup/startGraph load first) → no-op
     if (runtime.done.has(event.taskId)) return; // duplicate → no-op
     await this.completeTask(runtime, log.graphId, event.taskId);
   }
@@ -118,12 +135,13 @@ export class RecoverableBaselineProtocol extends Protocol {
   }
 
   /**
-   * Return the in-memory runtime, rebuilding it from the durable log on the
-   * first touch (fresh start or post-crash restart) and re-driving the frontier.
+   * Load a graph's frontier into memory and drive it: rebuild from the durable
+   * log, then either signal completion (all done before a restart) or dispatch
+   * every ready task. Idempotent within a process — each graph is loaded once
+   * (by {@link onStartup} on a restart, or {@link startGraph} on a fresh run).
    */
-  private async ensureLoaded(graphId: GraphId): Promise<GraphRuntime> {
-    const existing = this.runtimes.get(graphId);
-    if (existing) return existing;
+  private async load(graphId: GraphId): Promise<void> {
+    if (this.runtimes.has(graphId)) return;
     const runtime = await this.rebuild(graphId);
     this.runtimes.set(graphId, runtime);
     if (runtime.remaining === 0) {
@@ -131,7 +149,6 @@ export class RecoverableBaselineProtocol extends Protocol {
     } else {
       for (const taskId of this.readyTasks(runtime)) await this.startTask(graphId, taskId);
     }
-    return runtime;
   }
 
   /** Rebuild a graph's frontier from S: the graph blob plus its `complete` log entries. */

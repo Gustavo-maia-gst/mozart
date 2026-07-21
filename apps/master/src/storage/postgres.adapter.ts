@@ -53,6 +53,11 @@ export class PostgresStorageAdapter implements StorageAdapter {
     );
   }
 
+  /** Wipe every row (end-of-run cleanup) — keeps the table so a later run reuses it. */
+  public async clear(): Promise<void> {
+    await this.pool.query('truncate table task_state');
+  }
+
   public async dispose(): Promise<void> {
     await this.pool.end();
   }

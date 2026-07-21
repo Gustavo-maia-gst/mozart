@@ -6,6 +6,7 @@ import { EventLogService } from '../event-log/event-log.service';
 import { FaultInjectorService } from '../fault/fault-injector.service';
 import { ProcessManagerService } from '../ipc-server/process-manager.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { StorageService } from '../storage/storage.service';
 import { CLOCK, RUN_ID, SCENARIO, SCHEDULER } from '../tokens';
 import { TransportService } from '../transport/transport.service';
 import { WorkerPoolService } from '../worker-pool/worker-pool.service';
@@ -45,6 +46,7 @@ export class RunService {
     private readonly metrics: MetricsService,
     private readonly transport: TransportService,
     private readonly activation: ActivationService,
+    private readonly storage: StorageService,
   ) {}
 
   public async run(opts: RunOptions = {}): Promise<RunSummary> {
@@ -77,6 +79,14 @@ export class RunService {
 
     await this.pm.shutdown(SHUTDOWN_GRACE_MS); // SIGTERM + wait for flush/exit, SIGKILL stragglers
     await this.sleep(DRAIN_MS); // let trailing events land
+
+    // Wipe shared storage now that every slave is gone — keeps a persistent
+    // backend (postgres) from carrying this run's state into the next. The event
+    // log (JSONL) is the durable record, so nothing analysable is lost.
+    // Best-effort: a cleanup failure must not fail an otherwise-complete run.
+    await this.storage.clear().catch((err: unknown) => {
+      this.logger.warn(`storage clear failed: ${String(err)}`);
+    });
   }
 
   /**
