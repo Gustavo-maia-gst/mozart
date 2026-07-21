@@ -270,7 +270,9 @@ function emitScenario(graphs: GraphSpec[], opts: Options): string {
     `name: ${opts.name ?? graphs.map((g) => g.id).join('+')}`,
     `seed: ${opts.seed}`,
     `protocol: ${opts.protocol}`,
-    `nodes: [{ id: n1, name: coordinator }]`,
+    // 3 coordinators by default (distributed protocols use all 3; the centralized
+    // baselines collapse to 1 on their own).
+    `nodes: 3`,
     `storage: { adapter: postgres }`,
     `transport: { ackTimeoutMs: 2000 }`,
     `latency:`,
@@ -278,8 +280,9 @@ function emitScenario(graphs: GraphSpec[], opts: Options): string {
     // shape real network/queue latency has. Lognormal with mu/sigma in log-space
     // chosen for mean ≈ 50ms, stddev ≈ 20ms (median ≈ 46ms).
     `  transport.deliver: { distribution: lognormal, mu: 3.84, sigma: 0.385 }`,
-    `  storage.read: { distribution: constant, value: 5 }`,
-    `  storage.save: { distribution: constant, value: 5 }`,
+    // Storage latency is left unset on purpose: with the postgres adapter that
+    // means the run pays the real DB round-trip (the dashboard shows it as
+    // "postgresql"). Add storage.read/storage.save here to simulate a fixed one.
     `endCondition: { type: timeout, ms: ${opts.timeoutMs} }`,
     ``,
     // Graphs last — they can be huge, so the tunable knobs above stay reachable

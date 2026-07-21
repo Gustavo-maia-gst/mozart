@@ -19,6 +19,28 @@ export function latencyResourceAttrs(latency: Scenario['latency']): Record<strin
   return attrs;
 }
 
+/** Storage actions whose latency, when not simulated, is the backend's real one. */
+const STORAGE_LATENCY_ACTIONS = ['storage.read', 'storage.save'] as const;
+
+/**
+ * When a storage action's latency is NOT simulated in the scenario, the latency
+ * a run actually pays is the real backend round-trip. For postgres we surface
+ * that as a `postgresql` marker on the `*.mean` label (instead of a number, or a
+ * missing label), so the dashboard's storage-latency axis reads "postgresql" for
+ * real-backend runs and the numeric mean for simulated ones. Only fills actions
+ * the scenario left unconfigured, so a simulated latency (a number) always wins.
+ */
+export function storageBackendLatencyAttrs(scenario: Scenario): Record<string, string> {
+  if (scenario.storage.adapter !== 'postgres') return {};
+  const attrs: Record<string, string> = {};
+  for (const action of STORAGE_LATENCY_ACTIONS) {
+    if (scenario.latency[action] === undefined) {
+      attrs[`mozart.latency.${action.replaceAll('.', '_')}.mean`] = 'postgresql';
+    }
+  }
+  return attrs;
+}
+
 /** The distribution's summary stat used as its representative "mean" label. */
 function summarize(dist: DistributionConfig): { mean: number; stddev?: number } {
   switch (dist.distribution) {

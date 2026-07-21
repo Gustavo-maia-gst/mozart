@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import { fanStats } from '@mozart/contracts';
 import { initTelemetry } from '@mozart/telemetry';
 import { loadEnv } from './config/env';
-import { latencyResourceAttrs } from './metrics/resource-attrs';
+import { latencyResourceAttrs, storageBackendLatencyAttrs } from './metrics/resource-attrs';
 import { loadScenario } from './scenario/scenario';
 
 /**
@@ -132,6 +132,10 @@ async function bootstrap(): Promise<void> {
       'mozart.fanin.mean': fanIn.toFixed(2),
       'mozart.fanout.mean': fanOut.toFixed(2),
       ...latencyResourceAttrs(scenario.latency),
+      // Real (unsimulated) postgres storage latency surfaces as a "postgresql"
+      // marker on the storage-latency label, so the dashboard axis distinguishes
+      // real-backend runs from simulated-latency ones.
+      ...storageBackendLatencyAttrs(scenario),
     },
     otlpUrl: env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
     metricsOtlpUrl: env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,

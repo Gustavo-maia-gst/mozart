@@ -68,6 +68,16 @@ export class RunService {
   }
 
   private async execute(): Promise<void> {
+    // Start from a clean slate: with a persistent backend (postgres) a previous
+    // run's state can survive — and a stateless protocol's onStartup recovery
+    // (which runs before the handshake) would then "recover" that stale state on
+    // this fresh run, skipping work and reporting a bogus sub-critical-path
+    // makespan. Clearing here (not only at the end) makes correctness independent
+    // of whether the previous run's end-of-run cleanup actually fired.
+    await this.storage.clear().catch((err: unknown) => {
+      this.logger.warn(`pre-run storage clear failed: ${String(err)}`);
+    });
+
     this.pm.spawnAll();
     await this.pm.awaitAllReady(READY_TIMEOUT_MS);
     this.logger.log('all nodes ready — activating protocol');
